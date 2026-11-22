@@ -1,0 +1,8 @@
+{
+  "name": "gramwasi-server",
+  "version": "1.0.0",
+  "description": "GramWasi backend — accounts, posts, chat (E2EE), Telegram storage, Gmail code verification",
+  "main": "server.js",
+  "scripts": { "start": "node server.js" },
+  "engines": { "node": ">=18" }
+}
