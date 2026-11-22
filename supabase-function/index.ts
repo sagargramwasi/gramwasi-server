@@ -959,9 +959,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 10, min: 10,
-        apkUrl: process.env.APP_APK_URL || 'https://thunderous-lolly-b19730.netlify.app/GramWasi.apk',
-        notes: 'Naya — online dost, story like, followers list aur follow fix. Update karke hi app chalega.' });
+      return send(res, 200, { ok: true, latest: 12, min: 10,
+        apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
+        notes: 'Naya server — online dot, story like, popular reels sab chalu. Update karke hi app chalega.' });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
@@ -1120,10 +1120,16 @@ class __GwFakeRes {
 // "/functions/v1/<fn-name>" prefix hatao — bacha hua path /api/... ya
 // /health hona chahiye. Agar path pehle se /api ya /health se shuru hai
 // (local test), use waisa hi rakho.
+// Supabase kabhi path "/api/health" jaisa deta hai (function name "api"
+// retained) — server health sirf "/" aur "/health" par register karta
+// hai, isliye sirf in do exact paths ko map karo; baaki /api/* asli
+// routes hain, unhe mat chhuo.
 function __gwStripPrefix(pathname) {
   const m = pathname.match(/^\/functions\/v1\/[^/]+(\/.*)?$/);
-  if (m) return m[1] || "/";
-  return pathname;
+  const p = m ? (m[1] || "/") : pathname;
+  if (p === "/api/health") return "/health";
+  if (p === "/api" || p === "/api/") return "/";
+  return p;
 }
 
 async function __gwServeFetch(request) {
