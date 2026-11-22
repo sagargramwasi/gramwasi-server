@@ -127,6 +127,41 @@ async function refreshIfStale(p, method) {
   if (pendingSaves > 0) return;
   if (Date.now() - lastLoadAt > 4000) await loadDb(true);
 }
+// Mutation (koi bhi POST) se pehle taza data: kai warm serverless instances
+// apna-apna in-memory snapshot rakhte hain. Read refresh se kaam nahi chalta —
+// mutation purane snapshot par chale to (a) verify-email jaisi request
+// "pending not found" fail ho sakti hai kyunki signup kisi AUR instance par
+// hua tha, aur (b) is instance ka save doosre instance ke naye data ko
+// overwrite (clobber) kar sakta hai. Isliye har POST handler se pehle:
+//  - Supabase mode: last successful load 1500ms se purani ho tabhi reload
+//    (refreshIfStale wali hi machinery — loadDb(true) + lastLoadAt).
+//  - File mode: hamesha reload (sasta hai, single instance hai). Yahan
+//    loadDb(true) NAHI bulate: file mode me loadDb ka async IIFE bina kisi
+//    await ke synchronously khatam ho jata hai, to uske finally wala
+//    "dbLoading = null" assignment se pehle chal jata hai aur dbLoading
+//    hamesha ke liye ek settled promise par atka rehta hai — aage ke saare
+//    loadDb() calls bina reload kiye wahi purana promise lauta dete hain
+//    (no-op). Isliye file branch fileLoad()/normalizeDb() se seedha padhta
+//    hai; file na mile ya corrupt ho to in-memory copy hi rehti hai
+//    (seed se reset kabhi nahi).
+// Apna save chal raha ho (pendingSaves > 0) to refresh skip — warna beech me
+// purana stored snapshot aakar in-flight mutation ko revert kar dega.
+// Reload fail ho jaye to request crash NAHI hona chahiye: in-memory copy se
+// continue karo, sirf warning log karo (loadDb khud bhi throw nahi karta,
+// ye try/catch extra suraksha hai).
+async function refreshBeforeMutation() {
+  try {
+    if (pendingSaves > 0) return;
+    if (SUPABASE_ON) {
+      if (Date.now() - lastLoadAt > 1500) await loadDb(true);
+    } else {
+      const data = fileLoad();
+      if (data) { db = normalizeDb(data); dbHasData = true; lastLoadAt = Date.now(); }
+    }
+  } catch (e) {
+    console.warn('[storage] mutation refresh fail, in-memory DB se continue:', (e && e.message) || e);
+  }
+}
 async function saveDb() {
   if (!SUPABASE_ON) { fileSave(); return; }
   pendingSaves++;
@@ -353,6 +388,9 @@ async function handleRequest(req, res) {
   }
 
   const body = req.method === 'POST' ? await readBody(req) : {};
+  // Har POST handler se pehle DB fresh kar lo (upar refreshBeforeMutation
+  // dekho) — mutation kabhi purane snapshot par nahi chalna chahiye.
+  if (req.method === 'POST') await refreshBeforeMutation();
   const isAdmin = req.headers['x-admin-key'] === ADMIN_KEY;
 
   try {
@@ -542,11 +580,15 @@ async function handleRequest(req, res) {
       // versions ke liye). Dono taraf ki list saath update hoti hai aur counts
       // pub() me lists ki length se bante hain — hamesha lists se sync.
       // Follow TRANSITION (nahi tha -> ho gaya) par target ko notification.
-      if (!body.from || !body.to) return send(res, 400, { error: 'from aur to dono chahiye' });
-      if (String(body.from).toLowerCase().trim() === String(body.to).toLowerCase().trim()) {
+      // Kuch clients {user, target} naam bhej dete hain — from/to maujud na
+      // ho to unhe alias ki tarah le lo. Contract wahi hai, sirf naam ki choot.
+      const fromName = body.from || body.user;
+      const toName = body.to || body.target;
+      if (!fromName || !toName) return send(res, 400, { error: 'from aur to dono chahiye' });
+      if (String(fromName).toLowerCase().trim() === String(toName).toLowerCase().trim()) {
         return send(res, 400, { error: 'khud ko follow nahi kar sakte' });
       }
-      const me = byName(body.from), other = byName(body.to);
+      const me = byName(fromName), other = byName(toName);
       if (!me || !other) return send(res, 404, { error: 'user nahi mila' });
       if (!Array.isArray(me.following)) me.following = [];
       if (!Array.isArray(other.followers)) other.followers = [];
