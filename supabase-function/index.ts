@@ -459,13 +459,13 @@ async function tgStorePostImage(post) {
   } catch (e) { /* Telegram fail ho to post server par hi rehta hai */ }
 }
 function tgMirrorMessage(m) {
-  if (!TG_ON) return;
+  if (!TG_ON) return Promise.resolve(null);
   // Encrypted message (enc: se shuru) Telegram par bhi sirf cipher jata hai —
   // asli text na server ko milta hai, na Telegram ko. 🔒
   const bodyText = String(m.text || '').startsWith('enc:')
     ? '🔒 encrypted message (sirf bhejne wala aur paane wala hi padh sakta hai)'
     : m.text;
-  tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
+  return tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
 }
 
 async function handleRequest(req, res) {
@@ -822,7 +822,7 @@ async function handleRequest(req, res) {
         caption: body.caption || '', likedBy: [], baseLikes: 0, comments: [], createdAt: Date.now() };
       if (body.video) post.video = true;
       db.posts.push(post); await saveDb();
-      tgStorePostImage(post); // background me Telegram storage par bhej do (free space)
+      await tgStorePostImage(post); // response se PEHLE Telegram storage (Edge Functions par background kaam response ke baad mar jata hai)
       return send(res, 201, { post: serializePost(post) });
     }
     if (p === '/api/posts/like' && req.method === 'POST') {
@@ -974,7 +974,7 @@ async function handleRequest(req, res) {
       const m = { id: db.seq++, from: from.username, to: to.username, text: String(body.text), at: Date.now(), read: false };
       if (body.enc) m.enc = true; // E2EE payload hai — inbox me kind 'enc' dikhega, text snippet nahi
       db.messages.push(m); await saveDb();
-      tgMirrorMessage(m); // Telegram par backup copy (free storage)
+      try { await tgMirrorMessage(m); } catch (e) { /* Telegram fail ho to bhi chat send fail nahi hoga */ } // Telegram par backup copy (free storage)
       return send(res, 201, { message: m });
     }
     // Admin endpoints
