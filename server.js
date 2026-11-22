@@ -40,7 +40,7 @@ function seedData() {
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
-    followers: [], following: [], acceptedChats: [], blockedUsers: [], createdAt: Date.now()
+    followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, createdAt: Date.now()
   });
   d.users.push(mk('demo', 'Demo User', true), mk('aarav_sharma', 'Aarav Sharma', true),
     mk('priya_singh', 'Priya Singh', false), mk('rohit_kumar', 'Rohit Kumar', false));
@@ -462,7 +462,7 @@ async function handleRequest(req, res) {
         emailVerified: true,
         avatar: 'https://picsum.photos/seed/' + username + '/150/150',
         passwordHash: pend.passwordHash, verified: false, blocked: false,
-        followers: [], following: [], acceptedChats: [], blockedUsers: [], createdAt: Date.now() };
+        followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, createdAt: Date.now() };
       db.users.push(u);
       delete db.pending[username];
       await saveDb();
@@ -691,8 +691,16 @@ async function handleRequest(req, res) {
       if (meU && otherU && (meU.blockedUsers || []).indexOf(otherU.username) >= 0) {
         return send(res, 200, { messages: [] });
       }
-      const msgs = db.messages.filter(m =>
-        (m.from === me && m.to === other) || (m.from === other && m.to === me));
+      // Maine chat delete (clear) ki hai to us time tak ke message mujhe nahi
+      // dikhenge — sirf clear ke BAAD aaye hue dikhenge. Samne wale ko sab
+      // dikhta rehta hai (uske apne chatCleared se faisla hota hai).
+      const clearedAt = (meU && meU.chatCleared && otherU &&
+        typeof meU.chatCleared[otherU.username] === 'number') ? meU.chatCleared[otherU.username] : 0;
+      const msgs = db.messages.filter(m => {
+        if (!((m.from === me && m.to === other) || (m.from === other && m.to === me))) return false;
+        const at = typeof m.at === 'number' ? m.at : (m.createdAt || 0);
+        return at > clearedAt;
+      });
       return send(res, 200, { messages: msgs });
     }
     if (p === '/api/chat/accept' && req.method === 'POST') {
@@ -721,12 +729,17 @@ async function handleRequest(req, res) {
         else if (m.to === me.username) partner = m.from;
         if (!partner || partner === me.username) return;
         if (blockedList.indexOf(partner) >= 0) return;
+        // Chat clear ki hai to us time tak ke message is summary me bilkul
+        // nahi gine jayenge — koi message bacha hi nahi to conversation
+        // entry bhi nahi banegi (inbox se gayab).
+        const at = typeof m.at === 'number' ? m.at : (m.createdAt || 0);
+        const clearedAt = (me.chatCleared && typeof me.chatCleared[partner] === 'number') ? me.chatCleared[partner] : 0;
+        if (at <= clearedAt) return;
         const c = convos[partner] || (convos[partner] = { with: partner, lastAt: 0,
           lastFrom: null, lastKind: 'text', lastText: null, unread: 0,
           hasSent: false, iFollow: myFollowing.indexOf(partner) >= 0 });
         if (m.from === me.username) c.hasSent = true;
         if (m.to === me.username && m.read !== true) c.unread++;
-        const at = typeof m.at === 'number' ? m.at : 0;
         if (at >= c.lastAt) {
           c.lastAt = at; c.lastFrom = m.from;
           if (m.enc) { c.lastKind = 'enc'; c.lastText = null; }
@@ -743,10 +756,17 @@ async function handleRequest(req, res) {
       // to===user wale gine jate hain.
       const me = String(url.searchParams.get('user') || '').toLowerCase().trim();
       if (!me) return send(res, 400, { error: 'user chahiye' });
+      const meU = byName(me);
+      const clearedMap = (meU && meU.chatCleared) || {};
       const counts = {};
       let total = 0;
       db.messages.forEach(m => {
-        if (m.to === me && m.read !== true) { counts[m.from] = (counts[m.from] || 0) + 1; total++; }
+        if (m.to !== me || m.read === true) return;
+        // Chat clear ke pehle ke message unread badge me nahi gine jayenge.
+        const at = typeof m.at === 'number' ? m.at : (m.createdAt || 0);
+        const clearedAt = typeof clearedMap[m.from] === 'number' ? clearedMap[m.from] : 0;
+        if (at <= clearedAt) return;
+        counts[m.from] = (counts[m.from] || 0) + 1; total++;
       });
       return send(res, 200, { ok: true, counts, total });
     }
@@ -760,11 +780,25 @@ async function handleRequest(req, res) {
       await saveDb();
       return send(res, 200, { ok: true });
     }
+    if (p === '/api/chat/delete' && req.method === 'POST') {
+      // Chat delete (WhatsApp "delete for me" jaisa): sirf MERI taraf se
+      // saaf hoti hai. Asli message delete NAHI hote — mere record par
+      // chatCleared[partner] = abhi ka time lag jata hai, aur chat / inbox /
+      // unread teeno us time tak ke message mere liye chhupa dete hain.
+      // Samne wale ko uski poori chat waise ki waisi dikhti rehti hai.
+      // Clear ke baad aaya naya message phir se dikhne lagega.
+      const me = byName(body.user), other = byName(body.with);
+      if (!body.user || !body.with || !me || !other) return send(res, 400, { error: 'user aur with dono chahiye' });
+      if (!me.chatCleared || typeof me.chatCleared !== 'object') me.chatCleared = {};
+      me.chatCleared[other.username] = Date.now();
+      await saveDb();
+      return send(res, 200, { ok: true });
+    }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 8, min: 8,
+      return send(res, 200, { ok: true, latest: 9, min: 9,
         apkUrl: process.env.APP_APK_URL || 'https://thunderous-lolly-b19730.netlify.app/GramWasi.apk',
-        notes: 'Naya version — follow notification, message request, voice fix aur chat fix. Update karke hi app chalega.' });
+        notes: 'Naya design — Instagram jaisa chat, DM aur notification. Voice message hata diya gaya hai. Update karke hi app chalega.' });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
