@@ -29,7 +29,7 @@ globalThis.Buffer = __gwBuffer;
 // keys set hoti hain jo sach me maujud hain.
 {
   const __gwEnv = {};
-  for (const __gwK of ["SUPABASE_URL", "SUPABASE_ANON_KEY", "ADMIN_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"]) {
+  for (const __gwK of ["SUPABASE_URL", "SUPABASE_ANON_KEY", "ADMIN_KEY", "TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID", "SMTP_URL", "RESEND_API_KEY", "BREVO_API_KEY", "MAIL_FROM", "MAIL_FROM_EMAIL"]) {
     const __gwV = Deno.env.get(__gwK);
     if (__gwV !== undefined) __gwEnv[__gwK] = __gwV;
   }
