@@ -121,7 +121,7 @@ function ensureDb() { return loadDb(false); }
 // tabhi refresh; apna save chal raha ho to refresh skip (purana data na aaye).
 async function refreshIfStale(p, method) {
   if (!SUPABASE_ON || method !== 'GET') return;
-  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/posts' && p !== '/api/telegram/discover') return;
+  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/posts' && p !== '/api/telegram/discover') return;
   if (pendingSaves > 0) return;
   if (Date.now() - lastLoadAt > 4000) await loadDb(true);
 }
@@ -349,6 +349,12 @@ async function handleRequest(req, res) {
       if (!username || !body.password) return send(res, 400, { error: 'username aur password chahiye' });
       if (!email || !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return send(res, 400, { error: 'sahi Gmail/email dalo' });
       if (byName(username)) return send(res, 409, { error: 'username pehle se liya gaya hai, dusra chuno' });
+      // Pending signup bhi username ko hold karta hai: kisi AUR email wale ka
+      // pending hai to ye username nahi mil sakta. Wahi email ho to allow —
+      // pending overwrite hokar naya code jayega (resend jaisa).
+      db.pending = db.pending || {};
+      const heldPend = db.pending[username];
+      if (heldPend && heldPend.email !== email) return send(res, 409, { error: 'username pehle se liya gaya hai, dusra chuno' });
       if (db.users.some(x => x.email === email)) return send(res, 409, { error: 'is email se pehle hi account hai' });
       const code = String(Math.floor(100000 + Math.random() * 900000));
       db.pending = db.pending || {};
@@ -377,14 +383,28 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/verify-email' && req.method === 'POST') {
       // Sahi code = tab account BANTA hai. Galat code par kuch nahi banta.
+      // Username pehle se kisi verified user ka hai to bina saboot ke success
+      // NAHI milta — sirf wahi banda dobara verify ho sakta hai jiska pending
+      // email usi account ke email se match kare AUR code sahi ho.
       const username = String(body.username || '').toLowerCase().trim();
       db.pending = db.pending || {};
       const pend = db.pending[username];
       const existing = byName(username);
-      if (existing && existing.emailVerified) return send(res, 200, { user: pub(existing), already: true });
+      if (existing && existing.emailVerified) {
+        if (pend && String(body.code || '') === pend.code && pend.email === existing.email) {
+          delete db.pending[username]; await saveDb();
+          return send(res, 200, { user: pub(existing), already: true });
+        }
+        // Dusre email wala pending is username par kabza nahi rakh sakta — hata do.
+        if (pend && pend.email !== existing.email) { delete db.pending[username]; await saveDb(); }
+        return send(res, 409, { error: 'ye username pehle se liya gaya hai — login karo ya dusra username chuno' });
+      }
       if (!pend) return send(res, 404, { error: 'pehle signup karke code lo' });
       if (String(body.code || '') !== pend.code) return send(res, 400, { error: 'galat code — account nahi bana' });
       if (Date.now() - (pend.codeAt || 0) > 15 * 60 * 1000) { delete db.pending[username]; await saveDb(); return send(res, 400, { error: 'code expire ho gaya, dobara signup karo' }); }
+      // Aakhri safety check, account bante hi pehle: is username ka user pehle
+      // se maujood hai to DOOSRA account kabhi nahi banna chahiye.
+      if (byName(username)) return send(res, 409, { error: 'ye username pehle se liya gaya hai — login karo ya dusra username chuno' });
       const u = { id: db.seq++, username, name: pend.name, bio: '', email: pend.email,
         emailVerified: true,
         avatar: 'https://picsum.photos/seed/' + username + '/150/150',
@@ -488,10 +508,39 @@ async function handleRequest(req, res) {
         (m.from === me && m.to === other) || (m.from === other && m.to === me));
       return send(res, 200, { messages: msgs });
     }
+    if (p === '/api/chat/unread' && req.method === 'GET') {
+      // Har partner ke kitne message unread hain (badge count ke liye).
+      // Apne bheje hue message khud ke liye kabhi unread nahi hote — sirf
+      // to===user wale gine jate hain.
+      const me = String(url.searchParams.get('user') || '').toLowerCase().trim();
+      if (!me) return send(res, 400, { error: 'user chahiye' });
+      const counts = {};
+      let total = 0;
+      db.messages.forEach(m => {
+        if (m.to === me && m.read !== true) { counts[m.from] = (counts[m.from] || 0) + 1; total++; }
+      });
+      return send(res, 200, { ok: true, counts, total });
+    }
+    if (p === '/api/chat/read' && req.method === 'POST') {
+      // Ek partner ke saare aaye hue message read mark kar do (chat khulte hi).
+      const me = byName(body.user), other = byName(body.with);
+      if (!body.user || !body.with || !me || !other) return send(res, 400, { error: 'user aur with dono chahiye' });
+      db.messages.forEach(m => {
+        if (m.from === other.username && m.to === me.username) m.read = true;
+      });
+      await saveDb();
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/app-version' && req.method === 'GET') {
+      // Force update: app is endpoint se latest/min version check karta hai.
+      return send(res, 200, { ok: true, latest: 6, min: 6,
+        apkUrl: process.env.APP_APK_URL || 'https://thunderous-lolly-b19730.netlify.app/GramWasi.apk',
+        notes: 'Naya version aa gaya hai — chat fix, follow aur bahut kuch. Update karke hi app chalega.' });
+    }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
       if (!from || !to || !body.text) return send(res, 400, { error: 'bad message' });
-      const m = { id: db.seq++, from: from.username, to: to.username, text: String(body.text), at: Date.now() };
+      const m = { id: db.seq++, from: from.username, to: to.username, text: String(body.text), at: Date.now(), read: false };
       db.messages.push(m); await saveDb();
       tgMirrorMessage(m); // Telegram par backup copy (free storage)
       return send(res, 201, { message: m });
