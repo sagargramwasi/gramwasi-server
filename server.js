@@ -9,13 +9,13 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'gramwasi-admin-123';
-const DB_FILE = path.join(__dirname, 'data.json');
+const DATA_FILE = process.env.GRAMWASI_DATA_FILE || (process.env.VERCEL ? '/tmp/gramwasi-data.json' : path.join(__dirname, 'data.json'));
 
 let db = { users: [], posts: [], messages: [], seq: 1 };
 function load() {
-  try { db = JSON.parse(fs.readFileSync(DB_FILE, 'utf8')); } catch (e) { seed(); }
+  try { db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch (e) { seed(); }
 }
-function save() { fs.writeFileSync(DB_FILE, JSON.stringify(db, null, 1)); }
+function save() { try { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 1)); } catch (e) { /* data write fail ho to request crash nahi hona chahiye */ } }
 function seed() {
   db = { users: [], posts: [], messages: [], seq: 1 };
   const mk = (u, name, verified) => ({
@@ -185,7 +185,7 @@ function tgMirrorMessage(m) {
   tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
 }
 
-const server = http.createServer(async (req, res) => {
+async function handleRequest(req, res) {
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   if (req.method === 'OPTIONS') { send(res, 200, {}); return; }
@@ -394,7 +394,12 @@ const server = http.createServer(async (req, res) => {
   } catch (e) {
     send(res, 500, { error: String(e && e.message || e) });
   }
-});
+}
+
+const server = http.createServer(handleRequest);
 
 load();
-server.listen(PORT, () => console.log('GramWasi server running on port ' + PORT));
+if (require.main === module) {
+  server.listen(PORT, () => console.log('GramWasi server running on port ' + PORT));
+}
+module.exports = handleRequest;
