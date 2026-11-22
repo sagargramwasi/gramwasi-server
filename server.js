@@ -27,7 +27,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
-let db = { users: [], posts: [], messages: [], seq: 1 };
+let db = { users: [], posts: [], messages: [], stories: [], seq: 1 };
 let dbReady = false;   // pehli load koshish ho chuki hai
 let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
 let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
@@ -36,7 +36,7 @@ let pendingSaves = 0;  // chal rahe Supabase saves ki ginti
 let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
 
 function seedData() {
-  const d = { users: [], posts: [], messages: [], seq: 1 };
+  const d = { users: [], posts: [], messages: [], stories: [], seq: 1 };
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
@@ -47,11 +47,12 @@ function seedData() {
   return d;
 }
 function normalizeDb(d) {
-  const out = { users: [], posts: [], messages: [], seq: 1 };
+  const out = { users: [], posts: [], messages: [], stories: [], seq: 1 };
   if (d && typeof d === 'object') {
     if (Array.isArray(d.users)) out.users = d.users;
     if (Array.isArray(d.posts)) out.posts = d.posts;
     if (Array.isArray(d.messages)) out.messages = d.messages;
+    if (Array.isArray(d.stories)) out.stories = d.stories;
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
   }
@@ -121,7 +122,7 @@ function ensureDb() { return loadDb(false); }
 // tabhi refresh; apna save chal raha ho to refresh skip (purana data na aaye).
 async function refreshIfStale(p, method) {
   if (!SUPABASE_ON || method !== 'GET') return;
-  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/posts' && p !== '/api/telegram/discover') return;
+  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover') return;
   if (pendingSaves > 0) return;
   if (Date.now() - lastLoadAt > 4000) await loadDb(true);
 }
@@ -432,6 +433,76 @@ async function handleRequest(req, res) {
     if (p === '/api/users' && req.method === 'GET') {
       return send(res, 200, { users: db.users.filter(u => !u.blocked).map(pub) });
     }
+    if (p === '/api/profile' && req.method === 'POST') {
+      // Profile update: sirf wahi fields badlo jo body me bheje gaye hain
+      // (name / bio / avatar). Avatar data URL ho sakta hai — ~700KB tak ki
+      // string allow hai, usse badi reject (400). pub() me name/bio/avatar
+      // pehle se shamil hain, to response me updated profile turant dikhta hai.
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      if (body.avatar !== undefined) {
+        if (typeof body.avatar !== 'string' || body.avatar.length > 700 * 1024) {
+          return send(res, 400, { error: 'avatar bahut bada hai (max ~700KB)' });
+        }
+      }
+      if (body.name !== undefined) u.name = String(body.name);
+      if (body.bio !== undefined) u.bio = String(body.bio);
+      if (body.avatar !== undefined) u.avatar = body.avatar;
+      await saveDb();
+      return send(res, 200, { ok: true, user: pub(u) });
+    }
+    if (p === '/api/stories' && req.method === 'POST') {
+      // Story lagana: 24 ghante tak rehti hai. Image string chahiye
+      // (data URL, ~1.5MB tak). views me dekhene walon ke username jama hote hain.
+      const me = byName(body.username);
+      if (!me) return send(res, 404, { error: 'user nahi mila' });
+      if (typeof body.image !== 'string' || !body.image || body.image.length > 1.5 * 1024 * 1024) {
+        return send(res, 400, { error: 'story image chahiye (max ~1.5MB)' });
+      }
+      db.stories = db.stories || [];
+      const story = { id: db.seq++, username: me.username, image: body.image,
+        caption: body.caption ? String(body.caption) : '', at: Date.now(), views: [] };
+      db.stories.push(story);
+      await saveDb();
+      return send(res, 201, { ok: true, story });
+    }
+    if (p === '/api/stories' && req.method === 'GET') {
+      // Sirf pichhle 24 ghante ki stories, user ke hisaab se group karke —
+      // sabse nayi story wala group sabse upar. Expire ho chuki stories
+      // is read par db se hata bhi dete hain (aur kuch hata to save).
+      db.stories = db.stories || [];
+      const cutoff = Date.now() - 24 * 60 * 60 * 1000;
+      const before = db.stories.length;
+      db.stories = db.stories.filter(s => s && typeof s.at === 'number' && s.at > cutoff);
+      if (db.stories.length !== before) await saveDb();
+      const byUser = {};
+      db.stories.forEach(s => {
+        if (!byUser[s.username]) byUser[s.username] = [];
+        byUser[s.username].push({ id: s.id, image: s.image, caption: s.caption || '', at: s.at, views: s.views || [] });
+      });
+      const groups = Object.keys(byUser).map(username => {
+        const items = byUser[username].slice().sort((a, b) => a.at - b.at);
+        return { username, items, latest: items.length ? items[items.length - 1].at : 0 };
+      }).sort((a, b) => b.latest - a.latest)
+        .map(g => ({ username: g.username, items: g.items }));
+      return send(res, 200, { ok: true, stories: groups });
+    }
+    if (p === '/api/stories/view' && req.method === 'POST') {
+      // Story dekhi gayi: viewer ka username views me jodo (ek baar hi).
+      // Khud ki story dekhne se view nahi badhta.
+      db.stories = db.stories || [];
+      const story = db.stories.find(s => s.id === Number(body.storyId));
+      if (!story) return send(res, 404, { error: 'story nahi mili' });
+      const v = byName(body.viewer);
+      const viewerName = v ? v.username : String(body.viewer || '').toLowerCase().trim();
+      if (!viewerName) return send(res, 400, { error: 'viewer chahiye' });
+      if (!Array.isArray(story.views)) story.views = [];
+      if (viewerName !== story.username && story.views.indexOf(viewerName) < 0) {
+        story.views.push(viewerName);
+        await saveDb();
+      }
+      return send(res, 200, { ok: true, views: story.views.length });
+    }
     if (p === '/api/keys' && req.method === 'POST') {
       // End-to-end encryption: user ki PUBLIC key server par rakhi jati hai.
       // Private key sirf user ke phone par rehti hai — server (aur Telegram
@@ -533,9 +604,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 6, min: 6,
+      return send(res, 200, { ok: true, latest: 7, min: 7,
         apkUrl: process.env.APP_APK_URL || 'https://thunderous-lolly-b19730.netlify.app/GramWasi.apk',
-        notes: 'Naya version aa gaya hai — chat fix, follow aur bahut kuch. Update karke hi app chalega.' });
+        notes: 'Naya version — voice message, story viewers, notification aur profile fix. Update karke hi app chalega.' });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
