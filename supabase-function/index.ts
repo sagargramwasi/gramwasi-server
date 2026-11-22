@@ -1126,7 +1126,15 @@ class __GwFakeRes {
 // routes hain, unhe mat chhuo.
 function __gwStripPrefix(pathname) {
   const m = pathname.match(/^\/functions\/v1\/[^/]+(\/.*)?$/);
-  const p = m ? (m[1] || "/") : pathname;
+  let p = m ? (m[1] || "/") : pathname;
+  // Production me Supabase gateway function-naam path me rakhta hai, aur app ka
+  // base URL bhi /api par khatm hota hai — isliye requests /api/api/<route> bankar
+  // aate hain. Doubled prefix ko ek baar collapse karo (zyada se zyada 2 baar).
+  for (let i = 0; i < 2; i++) {
+    if (p === "/api/api") { p = "/api"; break; }
+    if (p.startsWith("/api/api/")) { p = "/api/" + p.slice("/api/api/".length); continue; }
+    break;
+  }
   if (p === "/api/health") return "/health";
   if (p === "/api" || p === "/api/") return "/";
   return p;
