@@ -40,10 +40,11 @@ function seedData() {
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
-    followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, createdAt: Date.now()
+    followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, lastSeen: 0, createdAt: Date.now()
   });
   d.users.push(mk('demo', 'Demo User', true), mk('aarav_sharma', 'Aarav Sharma', true),
     mk('priya_singh', 'Priya Singh', false), mk('rohit_kumar', 'Rohit Kumar', false));
+  ensureSeedReels(d);
   return d;
 }
 function normalizeDb(d) {
@@ -57,7 +58,63 @@ function normalizeDb(d) {
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
   }
+  out.posts.forEach(migratePost);
+  ensureSeedReels(out);
   return out;
+}
+// Post likes ka model: storage me likedBy (usernames) + baseLikes (seed/purani
+// ginti) rehta hai; bahar hamesha likes = baseLikes + likedBy.length bhejte
+// hain. Purane post jinme likedBy nahi hai: likes agar array hai to wahi
+// likers the (likedBy ban jayenge), number hai to wahi baseLikes ban jayega.
+function migratePost(post) {
+  if (!post || typeof post !== 'object') return post;
+  if (!Array.isArray(post.likedBy)) {
+    if (Array.isArray(post.likes)) { post.likedBy = post.likes.slice(); post.baseLikes = 0; }
+    else if (typeof post.likes === 'number') { post.likedBy = []; post.baseLikes = post.likes; }
+    else post.likedBy = [];
+  }
+  if (typeof post.baseLikes !== 'number' || isNaN(post.baseLikes)) post.baseLikes = 0;
+  if ('likes' in post) delete post.likes;
+  if (!Array.isArray(post.comments)) post.comments = [];
+  return post;
+}
+function postLikesCount(post) { migratePost(post); return (post.baseLikes || 0) + post.likedBy.length; }
+function serializePost(post) {
+  migratePost(post);
+  const out = { ...post, likes: (post.baseLikes || 0) + post.likedBy.length,
+    likedBy: post.likedBy.slice(), user: post.username, author: pub(byName(post.username)) };
+  if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
+  return out;
+}
+// Seeded popular reels: Reels tab khali na lage isliye Google ke sample bucket
+// ke openly-usable videos. Shape app ke video post jaisi hi hai (video:true +
+// src me video URL + image me poster). id "pop*" prefix se app inhe asli user
+// reels ke BAAD rakhta hai; createdAt jaan-boojh kar purana hai taaki asli
+// reels hamesha naye/upar rahen.
+const GTV_SAMPLE = 'https://storage.googleapis.com/gtv-videos-bucket/sample/';
+const POP_REEL_DEFS = [
+  { id: 'pop1', username: 'aarav_sharma', file: 'ForBiggerBlazes.mp4', img: 'img/p1.jpg', baseLikes: 45200, caption: 'Popular reel 🔥 Full masti mode on #reels' },
+  { id: 'pop2', username: 'priya_singh', file: 'ForBiggerEscapes.mp4', img: 'img/p2.jpg', baseLikes: 38400, caption: 'Popular reel 🔥 Chhuttiyon ka plan ban gaya ✈️ #travel' },
+  { id: 'pop3', username: 'rohit_kumar', file: 'ForBiggerFun.mp4', img: 'img/p3.jpg', baseLikes: 27150, caption: 'Popular reel 🔥 Ye dekh ke hasna pakka hai 😂' },
+  { id: 'pop4', username: 'demo', file: 'ForBiggerJoyrides.mp4', img: 'img/p4.jpg', baseLikes: 19800, caption: 'Popular reel 🔥 Ride wala din 🏍️ #bikelife' },
+  { id: 'pop5', username: 'aarav_sharma', file: 'ForBiggerMeltdowns.mp4', img: 'img/p5.jpg', baseLikes: 15300, caption: 'Popular reel 🔥 Jab plan bigad jaye to aisa hota hai 😭😂' },
+  { id: 'pop6', username: 'priya_singh', file: 'Sintel.mp4', img: 'img/p6.jpg', baseLikes: 12750, caption: 'Popular reel 🔥 Sintel — dil chhu lene wali kahani 🎬' },
+  { id: 'pop7', username: 'rohit_kumar', file: 'BigBuckBunny.mp4', img: 'img/p7.jpg', baseLikes: 9800, caption: 'Popular reel 🔥 Big Buck Bunny — sabki pasand 🐰' },
+  { id: 'pop8', username: 'demo', file: 'ElephantsDream.mp4', img: 'img/p8.jpg', baseLikes: 2350, caption: 'Popular reel 🔥 Elephants Dream — sapno ki duniya 🐘' }
+];
+function ensureSeedReels(d) {
+  if (!d || !Array.isArray(d.posts)) return;
+  const have = new Set(d.posts.map(x => String(x.id)));
+  const missing = [];
+  POP_REEL_DEFS.forEach((r, i) => {
+    if (have.has(r.id)) return;
+    missing.push({ id: r.id, username: r.username, image: r.img, video: true,
+      src: GTV_SAMPLE + r.file, caption: r.caption, likedBy: [], baseLikes: r.baseLikes,
+      comments: [], createdAt: 1759000000000 - i * 86400000 });
+  });
+  // Shuru me jodo (sabse purane) — GET /api/posts reverse order me deta hai,
+  // isliye ye hamesha asli posts ke baad aayenge.
+  if (missing.length) d.posts = missing.concat(d.posts);
 }
 function fileLoad() {
   try {
@@ -238,6 +295,7 @@ function pub(u) {
     email: u.email || '', emailVerified: !!u.emailVerified,
     publicKey: u.publicKey || null,
     verified: u.verified, blocked: u.blocked,
+    lastSeen: typeof u.lastSeen === 'number' ? u.lastSeen : 0,
     followers: (u.followers || []).length, following: (u.following || []).length,
     followerList: u.followers || [], followingList: u.following || [] };
 }
@@ -462,7 +520,7 @@ async function handleRequest(req, res) {
         emailVerified: true,
         avatar: 'https://picsum.photos/seed/' + username + '/150/150',
         passwordHash: pend.passwordHash, verified: false, blocked: false,
-        followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, createdAt: Date.now() };
+        followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, lastSeen: 0, createdAt: Date.now() };
       db.users.push(u);
       delete db.pending[username];
       await saveDb();
@@ -509,6 +567,20 @@ async function handleRequest(req, res) {
       await saveDb();
       return send(res, 200, { ok: true, user: pub(u) });
     }
+    if (p === '/api/presence' && req.method === 'POST') {
+      // Presence heartbeat: app khula hai to har kuch second me ping aata
+      // hai — lastSeen update hota hai, jisse DM list me "online" sirf unhi
+      // ko dikhe jo sach me abhi app me hain. DB write bachane ke liye
+      // saveDb sirf tab hota hai jab pichhla lastSeen 30 second se purana
+      // ho; warna sirf memory update karke ok bhej dete hain.
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      const now = Date.now();
+      const prev = typeof u.lastSeen === 'number' ? u.lastSeen : 0;
+      u.lastSeen = now;
+      if (now - prev > 30 * 1000) await saveDb();
+      return send(res, 200, { ok: true, lastSeen: u.lastSeen });
+    }
     if (p === '/api/stories' && req.method === 'POST') {
       // Story lagana: 24 ghante tak rehti hai. Image string chahiye
       // (data URL, ~1.5MB tak). views me dekhene walon ke username jama hote hain.
@@ -519,7 +591,7 @@ async function handleRequest(req, res) {
       }
       db.stories = db.stories || [];
       const story = { id: db.seq++, username: me.username, image: body.image,
-        caption: body.caption ? String(body.caption) : '', at: Date.now(), views: [] };
+        caption: body.caption ? String(body.caption) : '', at: Date.now(), views: [], likes: [] };
       db.stories.push(story);
       await saveDb();
       return send(res, 201, { ok: true, story });
@@ -536,7 +608,7 @@ async function handleRequest(req, res) {
       const byUser = {};
       db.stories.forEach(s => {
         if (!byUser[s.username]) byUser[s.username] = [];
-        byUser[s.username].push({ id: s.id, image: s.image, caption: s.caption || '', at: s.at, views: s.views || [] });
+        byUser[s.username].push({ id: s.id, image: s.image, caption: s.caption || '', at: s.at, views: s.views || [], likes: Array.isArray(s.likes) ? s.likes : [] });
       });
       const groups = Object.keys(byUser).map(username => {
         const items = byUser[username].slice().sort((a, b) => a.at - b.at);
@@ -560,6 +632,23 @@ async function handleRequest(req, res) {
         await saveDb();
       }
       return send(res, 200, { ok: true, views: story.views.length });
+    }
+    if (p === '/api/stories/like' && req.method === 'POST') {
+      // Story like toggle: like hai to hat jata hai, nahi hai to lag jata
+      // hai. likes me username rehte hain; response me final state + kul
+      // count. Khud ki story like karna bhi chalega (koi special case nahi).
+      db.stories = db.stories || [];
+      const story = db.stories.find(s => s.id === Number(body.storyId));
+      if (!story) return send(res, 404, { error: 'story nahi mili' });
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      if (!Array.isArray(story.likes)) story.likes = [];
+      const i = story.likes.indexOf(u.username);
+      let liked;
+      if (i >= 0) { story.likes.splice(i, 1); liked = false; }
+      else { story.likes.push(u.username); liked = true; }
+      await saveDb();
+      return send(res, 200, { ok: true, liked, likes: story.likes.length });
     }
     if (p === '/api/keys' && req.method === 'POST') {
       // End-to-end encryption: user ki PUBLIC key server par rakhi jati hai.
@@ -653,29 +742,33 @@ async function handleRequest(req, res) {
       return send(res, 200, { ok: true, blocked });
     }
     if (p === '/api/posts' && req.method === 'GET') {
-      const posts = db.posts.slice().reverse().map(post => {
-        const out = { ...post, user: post.username, author: pub(byName(post.username)) };
-        if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
-        return out;
-      });
+      const posts = db.posts.slice().reverse().map(serializePost);
       return send(res, 200, { posts });
     }
     if (p === '/api/posts' && req.method === 'POST') {
       const me = byName(body.username);
       if (!me) return send(res, 400, { error: 'user nahi mila' });
       const post = { id: db.seq++, username: me.username, image: body.image || '',
-        caption: body.caption || '', likes: [], comments: [], createdAt: Date.now() };
+        caption: body.caption || '', likedBy: [], baseLikes: 0, comments: [], createdAt: Date.now() };
+      if (body.video) post.video = true;
       db.posts.push(post); await saveDb();
       tgStorePostImage(post); // background me Telegram storage par bhej do (free space)
-      return send(res, 201, { post: { ...post, user: post.username, author: pub(me) } });
+      return send(res, 201, { post: serializePost(post) });
     }
     if (p === '/api/posts/like' && req.method === 'POST') {
-      const post = db.posts.find(x => x.id === body.postId);
+      // Server-synced like toggle: likedBy me username jodo/hatao; jawab me
+      // hamesha computed count (baseLikes + likedBy.length). postId number
+      // (asli post) ya "pop*" string (seeded reel) dono chalega.
+      const post = db.posts.find(x => String(x.id) === String(body.postId));
       const me = byName(body.username);
-      if (!post || !me) return send(res, 400, { error: 'bad like' });
-      const i = post.likes.indexOf(me.username);
-      if (i >= 0) post.likes.splice(i, 1); else post.likes.push(me.username);
-      await saveDb(); return send(res, 200, { likes: post.likes.length, likedBy: post.likes });
+      if (!post || !me) return send(res, 404, { error: 'post ya user nahi mila' });
+      migratePost(post);
+      const i = post.likedBy.indexOf(me.username);
+      let liked;
+      if (i >= 0) { post.likedBy.splice(i, 1); liked = false; }
+      else { post.likedBy.push(me.username); liked = true; }
+      await saveDb();
+      return send(res, 200, { ok: true, liked, likes: (post.baseLikes || 0) + post.likedBy.length });
     }
     if (p === '/api/posts/comment' && req.method === 'POST') {
       const post = db.posts.find(x => x.id === body.postId);
@@ -796,9 +889,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 9, min: 9,
+      return send(res, 200, { ok: true, latest: 10, min: 10,
         apkUrl: process.env.APP_APK_URL || 'https://thunderous-lolly-b19730.netlify.app/GramWasi.apk',
-        notes: 'Naya design — Instagram jaisa chat, DM aur notification. Voice message hata diya gaya hai. Update karke hi app chalega.' });
+        notes: 'Naya — online dost, story like, followers list aur follow fix. Update karke hi app chalega.' });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
@@ -821,7 +914,7 @@ async function handleRequest(req, res) {
         const storyCutoff = Date.now() - 24 * 60 * 60 * 1000;
         return send(res, 200, { users: db.users.length, posts: db.posts.length,
           messages: db.messages.length,
-          likes: db.posts.reduce((a, x) => a + x.likes.length, 0),
+          likes: db.posts.reduce((a, x) => a + postLikesCount(x), 0),
           stories: (db.stories || []).filter(s => s && typeof s.at === 'number' && s.at > storyCutoff).length,
           pendingSignups: Object.keys(db.pending || {}).length });
       }
