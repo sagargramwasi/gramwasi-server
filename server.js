@@ -27,7 +27,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
-let db = { users: [], posts: [], messages: [], stories: [], seq: 1 };
+let db = { users: [], posts: [], messages: [], stories: [], notifications: [], seq: 1 };
 let dbReady = false;   // pehli load koshish ho chuki hai
 let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
 let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
@@ -36,23 +36,24 @@ let pendingSaves = 0;  // chal rahe Supabase saves ki ginti
 let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
 
 function seedData() {
-  const d = { users: [], posts: [], messages: [], stories: [], seq: 1 };
+  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], seq: 1 };
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
-    followers: [], following: [], createdAt: Date.now()
+    followers: [], following: [], acceptedChats: [], blockedUsers: [], createdAt: Date.now()
   });
   d.users.push(mk('demo', 'Demo User', true), mk('aarav_sharma', 'Aarav Sharma', true),
     mk('priya_singh', 'Priya Singh', false), mk('rohit_kumar', 'Rohit Kumar', false));
   return d;
 }
 function normalizeDb(d) {
-  const out = { users: [], posts: [], messages: [], stories: [], seq: 1 };
+  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], seq: 1 };
   if (d && typeof d === 'object') {
     if (Array.isArray(d.users)) out.users = d.users;
     if (Array.isArray(d.posts)) out.posts = d.posts;
     if (Array.isArray(d.messages)) out.messages = d.messages;
     if (Array.isArray(d.stories)) out.stories = d.stories;
+    if (Array.isArray(d.notifications)) out.notifications = d.notifications;
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
   }
@@ -122,7 +123,7 @@ function ensureDb() { return loadDb(false); }
 // tabhi refresh; apna save chal raha ho to refresh skip (purana data na aaye).
 async function refreshIfStale(p, method) {
   if (!SUPABASE_ON || method !== 'GET') return;
-  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover') return;
+  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/chat/inbox' && p !== '/api/notifications' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover') return;
   if (pendingSaves > 0) return;
   if (Date.now() - lastLoadAt > 4000) await loadDb(true);
 }
@@ -423,7 +424,7 @@ async function handleRequest(req, res) {
         emailVerified: true,
         avatar: 'https://picsum.photos/seed/' + username + '/150/150',
         passwordHash: pend.passwordHash, verified: false, blocked: false,
-        followers: [], following: [], createdAt: Date.now() };
+        followers: [], following: [], acceptedChats: [], blockedUsers: [], createdAt: Date.now() };
       db.users.push(u);
       delete db.pending[username];
       await saveDb();
@@ -442,7 +443,12 @@ async function handleRequest(req, res) {
       if (u.blocked) return send(res, 403, { error: 'account blocked hai' });
       if (u.email && !u.emailVerified) return send(res, 403, { error: 'pehle email verify karo', needVerify: true, username: u.username });
       u.lastLoginAt = Date.now(); await saveDb();
-      return send(res, 200, { user: pub(u) });
+      // Message-request system ke liye: kaunsi chats accept ho chuki hain aur
+      // kaun blocked hai — app ko login par hi mil jata hai (purane records par
+      // ye fields na ho to khali array).
+      return send(res, 200, { user: pub(u),
+        acceptedChats: Array.isArray(u.acceptedChats) ? u.acceptedChats : [],
+        blockedUsers: Array.isArray(u.blockedUsers) ? u.blockedUsers : [] });
     }
     if (p === '/api/users' && req.method === 'GET') {
       return send(res, 200, { users: db.users.filter(u => !u.blocked).map(pub) });
@@ -529,9 +535,13 @@ async function handleRequest(req, res) {
       return send(res, 200, { ok: true });
     }
     if (p === '/api/follow' && req.method === 'POST') {
-      // TOGGLE: pehle se follow hai to unfollow, nahi hai to follow.
-      // Dono taraf ki list (following/followers) saath update hoti hai aur
-      // counts pub() me lists ki length se bante hain — hamesha lists se sync.
+      // Do mode: (1) body.action = "follow" | "unfollow" ho to state EXPLICIT
+      // set hoti hai — idempotent (pehle se follow hai to follow hi rehta hai,
+      // toggle nahi hota; v8 app yahi bhejta hai taaki follow apne aap revert
+      // na ho). (2) action na ho to purana TOGGLE behaviour (purane app
+      // versions ke liye). Dono taraf ki list saath update hoti hai aur counts
+      // pub() me lists ki length se bante hain — hamesha lists se sync.
+      // Follow TRANSITION (nahi tha -> ho gaya) par target ko notification.
       if (!body.from || !body.to) return send(res, 400, { error: 'from aur to dono chahiye' });
       if (String(body.from).toLowerCase().trim() === String(body.to).toLowerCase().trim()) {
         return send(res, 400, { error: 'khud ko follow nahi kar sakte' });
@@ -540,20 +550,65 @@ async function handleRequest(req, res) {
       if (!me || !other) return send(res, 404, { error: 'user nahi mila' });
       if (!Array.isArray(me.following)) me.following = [];
       if (!Array.isArray(other.followers)) other.followers = [];
+      const wasFollowing = me.following.indexOf(other.username) >= 0;
       let following;
-      const i = me.following.indexOf(other.username);
-      if (i >= 0) {
-        me.following.splice(i, 1);
-        const j = other.followers.indexOf(me.username);
-        if (j >= 0) other.followers.splice(j, 1);
-        following = false;
-      } else {
+      if (body.action === 'follow') following = true;
+      else if (body.action === 'unfollow') following = false;
+      else following = !wasFollowing;
+      if (following && !wasFollowing) {
         me.following.push(other.username);
         if (other.followers.indexOf(me.username) < 0) other.followers.push(me.username);
-        following = true;
+        db.notifications = db.notifications || [];
+        db.notifications.push({ id: db.seq++, user: other.username, type: 'follow',
+          from: me.username, createdAt: Date.now(), read: false });
+      } else if (!following && wasFollowing) {
+        me.following.splice(me.following.indexOf(other.username), 1);
+        const j = other.followers.indexOf(me.username);
+        if (j >= 0) other.followers.splice(j, 1);
       }
       await saveDb();
       return send(res, 200, { ok: true, following, user: pub(other), me: pub(me) });
+    }
+    if (p === '/api/notifications' && req.method === 'GET') {
+      // User ki notifications (abhi follow wali) — sabse nayi pehle, max 100.
+      const me = String(url.searchParams.get('user') || '').toLowerCase().trim();
+      if (!me) return send(res, 400, { error: 'user chahiye' });
+      db.notifications = db.notifications || [];
+      const list = db.notifications.filter(n => n.user === me)
+        .slice().sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0)).slice(0, 100);
+      return send(res, 200, { ok: true, notifications: list });
+    }
+    if (p === '/api/notifications/read' && req.method === 'POST') {
+      // User ki saari notifications read mark kar do.
+      const me = byName(body.user);
+      if (!me) return send(res, 404, { error: 'user nahi mila' });
+      db.notifications = db.notifications || [];
+      db.notifications.forEach(n => { if (n.user === me.username) n.read = true; });
+      await saveDb();
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/block-user' && req.method === 'POST') {
+      // User-level block (admin wale account-block se alag). blocked explicit
+      // boolean ho to wahi set hota hai, na ho to toggle. Block karne par
+      // follow DONO taraf se hat jata hai (main use follow nahi karta, wo
+      // mujhe nahi karta) aur chat band ho jati hai (send par 403, chat read
+      // par khali list, inbox se gayab).
+      const me = byName(body.user), other = byName(body.target);
+      if (!me || !other) return send(res, 404, { error: 'user nahi mila' });
+      if (me.username === other.username) return send(res, 400, { error: 'khud ko block nahi kar sakte' });
+      if (!Array.isArray(me.blockedUsers)) me.blockedUsers = [];
+      const has = me.blockedUsers.indexOf(other.username) >= 0;
+      const blocked = body.blocked === undefined ? !has : !!body.blocked;
+      if (blocked && !has) me.blockedUsers.push(other.username);
+      if (!blocked && has) me.blockedUsers.splice(me.blockedUsers.indexOf(other.username), 1);
+      if (blocked) {
+        if (Array.isArray(me.following)) me.following = me.following.filter(n => n !== other.username);
+        if (Array.isArray(me.followers)) me.followers = me.followers.filter(n => n !== other.username);
+        if (Array.isArray(other.following)) other.following = other.following.filter(n => n !== me.username);
+        if (Array.isArray(other.followers)) other.followers = other.followers.filter(n => n !== me.username);
+      }
+      await saveDb();
+      return send(res, 200, { ok: true, blocked });
     }
     if (p === '/api/posts' && req.method === 'GET') {
       const posts = db.posts.slice().reverse().map(post => {
@@ -589,9 +644,56 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/chat' && req.method === 'GET') {
       const me = url.searchParams.get('user'), other = url.searchParams.get('with');
+      // Maine use block kiya hai to mujhe uski chat khali dikhegi.
+      const meU = byName(me), otherU = byName(other);
+      if (meU && otherU && (meU.blockedUsers || []).indexOf(otherU.username) >= 0) {
+        return send(res, 200, { messages: [] });
+      }
       const msgs = db.messages.filter(m =>
         (m.from === me && m.to === other) || (m.from === other && m.to === me));
       return send(res, 200, { messages: msgs });
+    }
+    if (p === '/api/chat/accept' && req.method === 'POST') {
+      // Message request accept: partner ko meri acceptedChats me jodo —
+      // uski chat ab Requests se main inbox me chali jayegi.
+      const me = byName(body.user), other = byName(body.with);
+      if (!me || !other) return send(res, 400, { error: 'user aur with dono chahiye' });
+      if (!Array.isArray(me.acceptedChats)) me.acceptedChats = [];
+      if (me.acceptedChats.indexOf(other.username) < 0) me.acceptedChats.push(other.username);
+      await saveDb();
+      return send(res, 200, { ok: true, acceptedChats: me.acceptedChats });
+    }
+    if (p === '/api/chat/inbox' && req.method === 'GET') {
+      // Har partner ke saath ek conversation summary — sabse recent chat
+      // sabse upar (lastAt DESC). Blocked partner bilkul nahi dikhte.
+      // lastText sirf plaintext ka snippet hai; encrypted (enc) message ka
+      // text server par hota hi nahi, isliye null.
+      const me = byName(url.searchParams.get('user'));
+      if (!me) return send(res, 404, { error: 'user nahi mila' });
+      const blockedList = me.blockedUsers || [];
+      const myFollowing = me.following || [];
+      const convos = {};
+      db.messages.forEach(m => {
+        let partner = null;
+        if (m.from === me.username) partner = m.to;
+        else if (m.to === me.username) partner = m.from;
+        if (!partner || partner === me.username) return;
+        if (blockedList.indexOf(partner) >= 0) return;
+        const c = convos[partner] || (convos[partner] = { with: partner, lastAt: 0,
+          lastFrom: null, lastKind: 'text', lastText: null, unread: 0,
+          hasSent: false, iFollow: myFollowing.indexOf(partner) >= 0 });
+        if (m.from === me.username) c.hasSent = true;
+        if (m.to === me.username && m.read !== true) c.unread++;
+        const at = typeof m.at === 'number' ? m.at : 0;
+        if (at >= c.lastAt) {
+          c.lastAt = at; c.lastFrom = m.from;
+          if (m.enc) { c.lastKind = 'enc'; c.lastText = null; }
+          else if (String(m.text || '').startsWith('voice:')) { c.lastKind = 'voice'; c.lastText = String(m.text).slice(0, 80); }
+          else { c.lastKind = 'text'; c.lastText = String(m.text || '').slice(0, 80); }
+        }
+      });
+      const conversations = Object.keys(convos).map(k => convos[k]).sort((a, b) => b.lastAt - a.lastAt);
+      return send(res, 200, { ok: true, conversations });
     }
     if (p === '/api/chat/unread' && req.method === 'GET') {
       // Har partner ke kitne message unread hain (badge count ke liye).
@@ -618,14 +720,20 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 7, min: 7,
+      return send(res, 200, { ok: true, latest: 8, min: 8,
         apkUrl: process.env.APP_APK_URL || 'https://thunderous-lolly-b19730.netlify.app/GramWasi.apk',
-        notes: 'Naya version — voice message, story viewers, notification aur profile fix. Update karke hi app chalega.' });
+        notes: 'Naya version — follow notification, message request, voice fix aur chat fix. Update karke hi app chalega.' });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
       if (!from || !to || !body.text) return send(res, 400, { error: 'bad message' });
+      // Kisi ek taraf se bhi block hai to message nahi jayega.
+      if ((from.blockedUsers || []).indexOf(to.username) >= 0 ||
+          (to.blockedUsers || []).indexOf(from.username) >= 0) {
+        return send(res, 403, { error: 'blocked' });
+      }
       const m = { id: db.seq++, from: from.username, to: to.username, text: String(body.text), at: Date.now(), read: false };
+      if (body.enc) m.enc = true; // E2EE payload hai — inbox me kind 'enc' dikhega, text snippet nahi
       db.messages.push(m); await saveDb();
       tgMirrorMessage(m); // Telegram par backup copy (free storage)
       return send(res, 201, { message: m });
