@@ -206,6 +206,19 @@ function pub(u) {
     followerList: u.followers || [], followingList: u.following || [] };
 }
 function byName(name) { return db.users.find(u => u.username === String(name || '').toLowerCase()); }
+// Admin ke liye rich user record. passwordHash KABHI nahi jata, aur E2EE
+// publicKey ki value bhi nahi — sirf hasKey boolean (key set hai ya nahi).
+function adminUser(u) {
+  return { username: u.username, name: u.name, bio: u.bio || '', avatar: u.avatar,
+    email: u.email || '', emailVerified: !!u.emailVerified,
+    verified: !!u.verified, blocked: !!u.blocked,
+    followers: (u.followers || []).length, following: (u.following || []).length,
+    followerList: u.followers || [], followingList: u.following || [],
+    postCount: db.posts.filter(x => x.username === u.username).length,
+    messageCount: db.messages.filter(x => x.from === u.username).length,
+    createdAt: u.createdAt || null, lastLoginAt: u.lastLoginAt || null,
+    hasKey: !!u.publicKey };
+}
 
 function send(res, code, obj) {
   const body = JSON.stringify(obj);
@@ -428,6 +441,7 @@ async function handleRequest(req, res) {
       if (u.passwordHash !== hash(body.password || '')) return send(res, 401, { error: 'galat username/password' });
       if (u.blocked) return send(res, 403, { error: 'account blocked hai' });
       if (u.email && !u.emailVerified) return send(res, 403, { error: 'pehle email verify karo', needVerify: true, username: u.username });
+      u.lastLoginAt = Date.now(); await saveDb();
       return send(res, 200, { user: pub(u) });
     }
     if (p === '/api/users' && req.method === 'GET') {
@@ -620,9 +634,53 @@ async function handleRequest(req, res) {
     if (p.startsWith('/api/admin/')) {
       if (!isAdmin) return send(res, 401, { error: 'admin key chahiye' });
       if (p === '/api/admin/stats' && req.method === 'GET') {
+        const storyCutoff = Date.now() - 24 * 60 * 60 * 1000;
         return send(res, 200, { users: db.users.length, posts: db.posts.length,
           messages: db.messages.length,
-          likes: db.posts.reduce((a, x) => a + x.likes.length, 0) });
+          likes: db.posts.reduce((a, x) => a + x.likes.length, 0),
+          stories: (db.stories || []).filter(s => s && typeof s.at === 'number' && s.at > storyCutoff).length,
+          pendingSignups: Object.keys(db.pending || {}).length });
+      }
+      if (p === '/api/admin/users' && req.method === 'GET') {
+        // Rich user list admin panel ke liye — passwordHash kabhi nahi jata
+        // (sirf hash store hota hai, dekhna mumkin hi nahi by design).
+        return send(res, 200, { ok: true, users: db.users.map(adminUser) });
+      }
+      if (p === '/api/admin/reset-password' && req.method === 'POST') {
+        // Password DIKHAYA nahi ja sakta (sirf hash hai) — admin ka sahi
+        // tareeka yahi hai: user ke liye naya password SET kar do.
+        const u = byName(body.username);
+        if (!u) return send(res, 404, { error: 'user nahi mila' });
+        if (typeof body.newPassword !== 'string' || body.newPassword.length < 4) {
+          return send(res, 400, { error: 'newPassword kam se kam 4 character ka chahiye' });
+        }
+        u.passwordHash = hash(body.newPassword);
+        await saveDb();
+        return send(res, 200, { ok: true });
+      }
+      if (p === '/api/admin/delete-user' && req.method === 'POST') {
+        // User ko pura hata do: uske posts, stories, bheje/paaye message,
+        // aur dusro ki followers/following lists se uska naam bhi.
+        const u = byName(body.username);
+        if (!u) return send(res, 404, { error: 'user nahi mila' });
+        const un = u.username;
+        db.users = db.users.filter(x => x.username !== un);
+        db.posts = db.posts.filter(x => x.username !== un);
+        db.stories = (db.stories || []).filter(x => x.username !== un);
+        db.messages = db.messages.filter(x => x.from !== un && x.to !== un);
+        db.users.forEach(x => {
+          if (Array.isArray(x.followers)) x.followers = x.followers.filter(n => n !== un);
+          if (Array.isArray(x.following)) x.following = x.following.filter(n => n !== un);
+        });
+        await saveDb();
+        return send(res, 200, { ok: true });
+      }
+      if (p === '/api/admin/delete-post' && req.method === 'POST') {
+        const idx = db.posts.findIndex(x => x.id === Number(body.postId));
+        if (idx < 0) return send(res, 404, { error: 'post nahi mila' });
+        db.posts.splice(idx, 1);
+        await saveDb();
+        return send(res, 200, { ok: true });
       }
       if (p === '/api/admin/verify' && req.method === 'POST') {
         const u = byName(body.username);
