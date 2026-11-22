@@ -1,6 +1,7 @@
 // GramWasi backend server — zero-dependency Node.js
 // Run: node server.js   (PORT env, default 8080)
-// Data persists to data.json next to this file.
+// Data: SUPABASE_URL + SUPABASE_ANON_KEY set ho to Supabase (permanent, shared),
+// warna data.json file next to this file (ya VERCEL/NETLIFY par /tmp).
 // Admin API key: header x-admin-key: gramwasi-admin-123 (change before real use)
 const http = require('http');
 const fs = require('fs');
@@ -9,23 +10,127 @@ const crypto = require('crypto');
 
 const PORT = process.env.PORT || 8080;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'gramwasi-admin-123';
-const DATA_FILE = process.env.GRAMWASI_DATA_FILE || (process.env.VERCEL ? '/tmp/gramwasi-data.json' : path.join(__dirname, 'data.json'));
+const DATA_FILE = process.env.GRAMWASI_DATA_FILE || (process.env.VERCEL || process.env.NETLIFY ? '/tmp/gramwasi-data.json' : path.join(__dirname, 'data.json'));
+
+// ---------- Storage ----------
+// Do mode hai:
+//  1) SUPABASE (permanent + sab serverless instances ke beech shared):
+//     env SUPABASE_URL + SUPABASE_ANON_KEY set ho to pura DB ek hi jagah rehta
+//     hai — Supabase table public.app_state, sirf ek row (id=1), column data
+//     (jsonb) me pura DB object (wahi shape jo data.json me hota tha).
+//     Netlify par /tmp wali dikkat (ek instance ka banaya account dusre
+//     instance ko nahi dikhta) isiliye khatam ho jati hai.
+//  2) FILE (fallback, pehle jaisa behaviour): GRAMWASI_DATA_FILE set ho to wo
+//     path, VERCEL/NETLIFY par /tmp/gramwasi-data.json, warna server ke paas
+//     wali data.json.
+const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
+const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
 let db = { users: [], posts: [], messages: [], seq: 1 };
-function load() {
-  try { db = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8')); } catch (e) { seed(); }
-}
-function save() { try { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 1)); } catch (e) { /* data write fail ho to request crash nahi hona chahiye */ } }
-function seed() {
-  db = { users: [], posts: [], messages: [], seq: 1 };
+let dbReady = false;   // pehli load koshish ho chuki hai
+let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
+let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
+let lastLoadAt = 0;    // aakhri successful load/save ka time (ms)
+let pendingSaves = 0;  // chal rahe Supabase saves ki ginti
+let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
+
+function seedData() {
+  const d = { users: [], posts: [], messages: [], seq: 1 };
   const mk = (u, name, verified) => ({
-    id: db.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
+    id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
     followers: [], following: [], createdAt: Date.now()
   });
-  db.users.push(mk('demo', 'Demo User', true), mk('aarav_sharma', 'Aarav Sharma', true),
+  d.users.push(mk('demo', 'Demo User', true), mk('aarav_sharma', 'Aarav Sharma', true),
     mk('priya_singh', 'Priya Singh', false), mk('rohit_kumar', 'Rohit Kumar', false));
-  save();
+  return d;
+}
+function normalizeDb(d) {
+  const out = { users: [], posts: [], messages: [], seq: 1 };
+  if (d && typeof d === 'object') {
+    if (Array.isArray(d.users)) out.users = d.users;
+    if (Array.isArray(d.posts)) out.posts = d.posts;
+    if (Array.isArray(d.messages)) out.messages = d.messages;
+    if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
+    if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
+  }
+  return out;
+}
+function fileLoad() {
+  try {
+    const d = JSON.parse(fs.readFileSync(DATA_FILE, 'utf8'));
+    return (d && Array.isArray(d.users)) ? d : null;
+  } catch (e) { return null; }
+}
+function fileSave() { try { fs.writeFileSync(DATA_FILE, JSON.stringify(db, null, 1)); } catch (e) { /* data write fail ho to request crash nahi hona chahiye */ } }
+function sbSignal() { try { return AbortSignal.timeout(10000); } catch (e) { return undefined; } }
+async function sbLoad() {
+  const r = await fetch(SUPABASE_URL + '/rest/v1/app_state?id=eq.1&select=data', {
+    headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, signal: sbSignal() });
+  if (!r.ok) throw new Error('Supabase load HTTP ' + r.status);
+  const rows = await r.json();
+  if (Array.isArray(rows) && rows[0] && rows[0].data && Array.isArray(rows[0].data.users)) return rows[0].data;
+  return null;
+}
+async function sbSave() {
+  const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
+  const r = await fetch(SUPABASE_URL + '/rest/v1/app_state?id=eq.1', {
+    method: 'PATCH', headers: { ...headers, Prefer: 'return=minimal,count=exact' },
+    body: JSON.stringify({ data: db }), signal: sbSignal() });
+  if (!r.ok) throw new Error('Supabase save HTTP ' + r.status);
+  let affected = null;
+  const cr = r.headers.get('content-range');
+  if (cr && cr.indexOf('/') >= 0) { const n = parseInt(cr.split('/')[1], 10); if (!isNaN(n)) affected = n; }
+  if (affected > 0) { sbHasRow = true; return; }
+  if (affected === null && sbHasRow) return; // header na mile, par row pehle se pakki hai — PATCH par bharosa
+  // Row hi nahi hai (PATCH ne kuch affect nahi kiya) — upsert se bana do
+  const ins = await fetch(SUPABASE_URL + '/rest/v1/app_state', {
+    method: 'POST', headers: { ...headers, Prefer: 'resolution=merge-duplicates,return=minimal' },
+    body: JSON.stringify({ id: 1, data: db }), signal: sbSignal() });
+  if (!ins.ok) throw new Error('Supabase insert HTTP ' + ins.status);
+  sbHasRow = true;
+}
+async function loadDb(force) {
+  if (dbLoading) return dbLoading;
+  if (dbReady && !force) return;
+  dbLoading = (async () => {
+    try {
+      if (SUPABASE_ON) {
+        const data = await sbLoad();
+        if (data) { db = normalizeDb(data); sbHasRow = true; }
+        else { db = seedData(); await sbSave(); }
+      } else {
+        const data = fileLoad();
+        if (data) db = normalizeDb(data);
+        else { db = seedData(); fileSave(); }
+      }
+      dbHasData = true;
+      lastLoadAt = Date.now();
+    } catch (e) {
+      // Storage fail ho jaye to request crash nahi hona chahiye — in-memory/seed DB se kaam chalao
+      console.warn('[storage] load fail, in-memory DB se continue:', (e && e.message) || e);
+      if (!dbHasData) { db = seedData(); dbHasData = true; }
+    } finally { dbReady = true; dbLoading = null; }
+  })();
+  return dbLoading;
+}
+function ensureDb() { return loadDb(false); }
+// Read endpoints par taza data: dusre instance ne kuch likha ho to wo bhi dikhe
+// (chat polling, user search jaise cases ke liye). 4 second se purani load ho
+// tabhi refresh; apna save chal raha ho to refresh skip (purana data na aaye).
+async function refreshIfStale(p, method) {
+  if (!SUPABASE_ON || method !== 'GET') return;
+  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/posts' && p !== '/api/telegram/discover') return;
+  if (pendingSaves > 0) return;
+  if (Date.now() - lastLoadAt > 4000) await loadDb(true);
+}
+async function saveDb() {
+  if (!SUPABASE_ON) { fileSave(); return; }
+  pendingSaves++;
+  try { await sbSave(); lastLoadAt = Date.now(); }
+  catch (e) { console.warn('[storage] save fail:', (e && e.message) || e); }
+  finally { pendingSaves--; }
 }
 function hash(p) { return crypto.createHash('sha256').update('gw:' + p).digest('hex'); }
 // Real email sending needs a FREE mail service (koi paisa nahi lagta). Teen me se
@@ -96,8 +201,8 @@ function pub(u) {
     email: u.email || '', emailVerified: !!u.emailVerified,
     publicKey: u.publicKey || null,
     verified: u.verified, blocked: u.blocked,
-    followers: u.followers.length, following: u.following.length,
-    followerList: u.followers, followingList: u.following };
+    followers: (u.followers || []).length, following: (u.following || []).length,
+    followerList: u.followers || [], followingList: u.following || [] };
 }
 function byName(name) { return db.users.find(u => u.username === String(name || '').toLowerCase()); }
 
@@ -166,12 +271,12 @@ async function tgStorePostImage(post) {
       const buf = Buffer.from(b64, 'base64');
       if (buf.length > 0 && buf.length < 10 * 1024 * 1024) {
         const fid = await tgUploadPhoto(buf, '@' + post.username + ': ' + (post.caption || ''));
-        if (fid) { post.telegramFileId = fid; post.image = ''; save(); }
+        if (fid) { post.telegramFileId = fid; post.image = ''; await saveDb(); }
       }
     } else if (post.image.startsWith('http')) {
       const j = await tgCall('sendPhoto', { chat_id: TG_CHAT, photo: post.image, caption: '@' + post.username + ': ' + (post.caption || '') });
       const ph = j && j.result && j.result.photo;
-      if (ph) { post.telegramFileId = ph[ph.length - 1].file_id; save(); }
+      if (ph) { post.telegramFileId = ph[ph.length - 1].file_id; await saveDb(); }
     }
   } catch (e) { /* Telegram fail ho to post server par hi rehta hai */ }
 }
@@ -190,6 +295,9 @@ async function handleRequest(req, res) {
   const p = url.pathname;
   if (req.method === 'OPTIONS') { send(res, 200, {}); return; }
 
+  await ensureDb();
+  await refreshIfStale(p, req.method);
+
   // Serve admin panel at /admin if the file sits next to the server folder
   if (p === '/admin' || p === '/admin/') {
     const f = path.join(__dirname, '..', 'admin', 'index.html');
@@ -198,7 +306,7 @@ async function handleRequest(req, res) {
       res.end(fs.readFileSync(f)); return;
     }
   }
-  if (p === '/' || p === '/health') { send(res, 200, { app: 'GramWasi', ok: true, telegramStorage: TG_ON }); return; }
+  if (p === '/' || p === '/health') { send(res, 200, { app: 'GramWasi', ok: true, telegramStorage: TG_ON, storage: SUPABASE_ON ? 'supabase' : 'file' }); return; }
   if (p === '/api/media' && req.method === 'GET') {
     // Telegram par stored photo ko wapas dikhana: /api/media?postId=<id>
     const post = db.posts.find(x => x.id === Number(url.searchParams.get('postId')));
@@ -246,7 +354,7 @@ async function handleRequest(req, res) {
       db.pending = db.pending || {};
       db.pending[username] = { username, name: body.name || username, email,
         passwordHash: hash(body.password), code, codeAt: Date.now() };
-      save();
+      await saveDb();
       const sent = await sendMail(email, 'GramWasi verification code',
         'Namaste!\n\nTumhara GramWasi verification code hai: ' + code + '\n\nYe code 15 minute tak valid hai. Sahi code dalne par hi tumhara account banega.\n\n— GramWasi team');
       if (!MAIL_CONFIGURED) console.log('[DEMO MAIL] ' + email + ' ka verification code: ' + code);
@@ -260,7 +368,7 @@ async function handleRequest(req, res) {
       const pend = db.pending[username];
       if (!pend) return send(res, 404, { error: 'pending signup nahi mila, pehle signup karo' });
       pend.code = String(Math.floor(100000 + Math.random() * 900000));
-      pend.codeAt = Date.now(); save();
+      pend.codeAt = Date.now(); await saveDb();
       const sent = await sendMail(pend.email, 'GramWasi verification code',
         'Tumhara naya GramWasi verification code hai: ' + pend.code + '\nYe code 15 minute tak valid hai.');
       const out = { needVerify: true, mailSent: sent };
@@ -276,7 +384,7 @@ async function handleRequest(req, res) {
       if (existing && existing.emailVerified) return send(res, 200, { user: pub(existing), already: true });
       if (!pend) return send(res, 404, { error: 'pehle signup karke code lo' });
       if (String(body.code || '') !== pend.code) return send(res, 400, { error: 'galat code — account nahi bana' });
-      if (Date.now() - (pend.codeAt || 0) > 15 * 60 * 1000) { delete db.pending[username]; save(); return send(res, 400, { error: 'code expire ho gaya, dobara signup karo' }); }
+      if (Date.now() - (pend.codeAt || 0) > 15 * 60 * 1000) { delete db.pending[username]; await saveDb(); return send(res, 400, { error: 'code expire ho gaya, dobara signup karo' }); }
       const u = { id: db.seq++, username, name: pend.name, bio: '', email: pend.email,
         emailVerified: true,
         avatar: 'https://picsum.photos/seed/' + username + '/150/150',
@@ -284,7 +392,7 @@ async function handleRequest(req, res) {
         followers: [], following: [], createdAt: Date.now() };
       db.users.push(u);
       delete db.pending[username];
-      save();
+      await saveDb();
       return send(res, 201, { user: pub(u), created: true });
     }
     if (p === '/api/login' && req.method === 'POST') {
@@ -312,20 +420,39 @@ async function handleRequest(req, res) {
       if (!u || typeof body.publicKey !== 'string' || body.publicKey.length > 4000) {
         return send(res, 400, { error: 'bad key' });
       }
-      u.publicKey = body.publicKey; save();
+      u.publicKey = body.publicKey; await saveDb();
       return send(res, 200, { ok: true });
     }
     if (p === '/api/follow' && req.method === 'POST') {
+      // TOGGLE: pehle se follow hai to unfollow, nahi hai to follow.
+      // Dono taraf ki list (following/followers) saath update hoti hai aur
+      // counts pub() me lists ki length se bante hain — hamesha lists se sync.
+      if (!body.from || !body.to) return send(res, 400, { error: 'from aur to dono chahiye' });
+      if (String(body.from).toLowerCase().trim() === String(body.to).toLowerCase().trim()) {
+        return send(res, 400, { error: 'khud ko follow nahi kar sakte' });
+      }
       const me = byName(body.from), other = byName(body.to);
-      if (!me || !other || me === other) return send(res, 400, { error: 'bad follow' });
+      if (!me || !other) return send(res, 404, { error: 'user nahi mila' });
+      if (!Array.isArray(me.following)) me.following = [];
+      if (!Array.isArray(other.followers)) other.followers = [];
+      let following;
       const i = me.following.indexOf(other.username);
-      if (i >= 0) { me.following.splice(i, 1); other.followers.splice(other.followers.indexOf(me.username), 1); }
-      else { me.following.push(other.username); other.followers.push(me.username); }
-      save(); return send(res, 200, { user: pub(other), me: pub(me) });
+      if (i >= 0) {
+        me.following.splice(i, 1);
+        const j = other.followers.indexOf(me.username);
+        if (j >= 0) other.followers.splice(j, 1);
+        following = false;
+      } else {
+        me.following.push(other.username);
+        if (other.followers.indexOf(me.username) < 0) other.followers.push(me.username);
+        following = true;
+      }
+      await saveDb();
+      return send(res, 200, { ok: true, following, user: pub(other), me: pub(me) });
     }
     if (p === '/api/posts' && req.method === 'GET') {
       const posts = db.posts.slice().reverse().map(post => {
-        const out = { ...post, author: pub(byName(post.username)) };
+        const out = { ...post, user: post.username, author: pub(byName(post.username)) };
         if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
         return out;
       });
@@ -336,9 +463,9 @@ async function handleRequest(req, res) {
       if (!me) return send(res, 400, { error: 'user nahi mila' });
       const post = { id: db.seq++, username: me.username, image: body.image || '',
         caption: body.caption || '', likes: [], comments: [], createdAt: Date.now() };
-      db.posts.push(post); save();
+      db.posts.push(post); await saveDb();
       tgStorePostImage(post); // background me Telegram storage par bhej do (free space)
-      return send(res, 201, { post: { ...post, author: pub(me) } });
+      return send(res, 201, { post: { ...post, user: post.username, author: pub(me) } });
     }
     if (p === '/api/posts/like' && req.method === 'POST') {
       const post = db.posts.find(x => x.id === body.postId);
@@ -346,14 +473,14 @@ async function handleRequest(req, res) {
       if (!post || !me) return send(res, 400, { error: 'bad like' });
       const i = post.likes.indexOf(me.username);
       if (i >= 0) post.likes.splice(i, 1); else post.likes.push(me.username);
-      save(); return send(res, 200, { likes: post.likes.length, likedBy: post.likes });
+      await saveDb(); return send(res, 200, { likes: post.likes.length, likedBy: post.likes });
     }
     if (p === '/api/posts/comment' && req.method === 'POST') {
       const post = db.posts.find(x => x.id === body.postId);
       const me = byName(body.username);
       if (!post || !me || !body.text) return send(res, 400, { error: 'bad comment' });
       post.comments.push({ username: me.username, text: String(body.text), at: Date.now() });
-      save(); return send(res, 200, { comments: post.comments });
+      await saveDb(); return send(res, 200, { comments: post.comments });
     }
     if (p === '/api/chat' && req.method === 'GET') {
       const me = url.searchParams.get('user'), other = url.searchParams.get('with');
@@ -365,7 +492,7 @@ async function handleRequest(req, res) {
       const from = byName(body.from), to = byName(body.to);
       if (!from || !to || !body.text) return send(res, 400, { error: 'bad message' });
       const m = { id: db.seq++, from: from.username, to: to.username, text: String(body.text), at: Date.now() };
-      db.messages.push(m); save();
+      db.messages.push(m); await saveDb();
       tgMirrorMessage(m); // Telegram par backup copy (free storage)
       return send(res, 201, { message: m });
     }
@@ -380,13 +507,13 @@ async function handleRequest(req, res) {
       if (p === '/api/admin/verify' && req.method === 'POST') {
         const u = byName(body.username);
         if (!u) return send(res, 404, { error: 'user nahi mila' });
-        u.verified = !!body.verified; save();
+        u.verified = !!body.verified; await saveDb();
         return send(res, 200, { user: pub(u) });
       }
       if (p === '/api/admin/block' && req.method === 'POST') {
         const u = byName(body.username);
         if (!u) return send(res, 404, { error: 'user nahi mila' });
-        u.blocked = !!body.blocked; save();
+        u.blocked = !!body.blocked; await saveDb();
         return send(res, 200, { user: pub(u) });
       }
     }
@@ -398,7 +525,7 @@ async function handleRequest(req, res) {
 
 const server = http.createServer(handleRequest);
 
-load();
+ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
 if (require.main === module) {
   server.listen(PORT, () => console.log('GramWasi server running on port ' + PORT));
 }
