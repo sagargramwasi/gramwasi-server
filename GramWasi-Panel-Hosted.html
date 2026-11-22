@@ -1,0 +1,563 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GramWasi Admin</title>
+<style>
+  :root{
+    --bg:#070708; --bg2:#0e0e11; --card:#141419; --card2:#1a1a21; --line:#26262f;
+    --text:#f5f5f7; --muted:#9a9aa8; --orange:#ff7a18; --orange2:#ff9a3d;
+    --teal:#14c8b8; --red:#ff4d5e; --green:#2fd67a; --blue:#3d9bff;
+    --radius:16px;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html{-webkit-text-size-adjust:100%}
+  body{background:radial-gradient(1000px 500px at 85% -10%,rgba(255,122,24,.14),transparent 60%),radial-gradient(800px 400px at -10% 10%,rgba(20,200,184,.08),transparent 55%),var(--bg);
+    color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;min-height:100vh}
+  button{font-family:inherit;cursor:pointer}
+  input{font-family:inherit}
+  ::placeholder{color:#5c5c6a}
+
+  /* ============ LOGIN ============ */
+  #loginScreen{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:20px}
+  .login-card{width:100%;max-width:380px;background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);
+    border-radius:22px;padding:34px 28px 28px;box-shadow:0 30px 60px rgba(0,0,0,.55)}
+  .logo-badge{width:58px;height:58px;border-radius:17px;margin:0 auto 14px;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,var(--orange),#ff4d00);font-size:27px;font-weight:800;color:#fff;box-shadow:0 10px 26px rgba(255,122,24,.4)}
+  .login-card h1{text-align:center;font-size:23px;letter-spacing:.2px}
+  .login-card h1 span{color:var(--orange)}
+  .login-sub{text-align:center;color:var(--muted);font-size:13px;margin:6px 0 24px}
+  .field{margin-bottom:14px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;text-transform:uppercase;letter-spacing:.6px}
+  .field input{width:100%;background:#0b0b0e;border:1px solid var(--line);border-radius:12px;color:var(--text);
+    padding:13px 14px;font-size:15px;outline:none;transition:border-color .15s}
+  .field input:focus{border-color:var(--orange)}
+  .login-btn{width:100%;border:none;border-radius:12px;padding:14px;font-size:16px;font-weight:700;color:#fff;
+    background:linear-gradient(135deg,var(--orange),#ff5500);box-shadow:0 10px 22px rgba(255,122,24,.3);margin-top:4px}
+  .login-btn:active{transform:scale(.98)}
+  .login-err{display:none;background:rgba(255,77,94,.12);border:1px solid rgba(255,77,94,.45);color:#ff8b96;
+    border-radius:10px;padding:10px 12px;font-size:13.5px;text-align:center;margin-bottom:14px}
+  .login-err.show{display:block}
+  @keyframes shake{0%,100%{transform:translateX(0)}15%{transform:translateX(-9px)}30%{transform:translateX(9px)}45%{transform:translateX(-7px)}60%{transform:translateX(7px)}75%{transform:translateX(-4px)}90%{transform:translateX(4px)}}
+  .shake{animation:shake .45s ease}
+  .login-note{text-align:center;color:#5c5c6a;font-size:12px;margin-top:18px}
+
+  /* ============ DASHBOARD ============ */
+  #dashScreen{display:none}
+  header.top{position:sticky;top:0;z-index:40;background:rgba(9,9,11,.88);backdrop-filter:blur(12px);border-bottom:1px solid var(--line)}
+  .top-in{max-width:1220px;margin:0 auto;padding:13px 18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px;font-size:19px;font-weight:800}
+  .brand .logo-badge{width:36px;height:36px;border-radius:11px;font-size:17px;margin:0;box-shadow:0 6px 16px rgba(255,122,24,.35)}
+  .brand span{color:var(--orange)}
+  .status-pill{display:flex;align-items:center;gap:7px;background:var(--card);border:1px solid var(--line);border-radius:999px;padding:6px 12px;font-size:12.5px;color:var(--muted)}
+  .dot{width:9px;height:9px;border-radius:50%;background:#666;flex:none}
+  .dot.on{background:var(--green);box-shadow:0 0 9px var(--green)}
+  .dot.off{background:var(--red);box-shadow:0 0 9px var(--red)}
+  .top-right{margin-left:auto;display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .updated{font-size:12px;color:var(--muted)}
+  .auto-tag{font-size:11px;color:var(--teal);border:1px solid rgba(20,200,184,.4);padding:3px 8px;border-radius:999px}
+  .btn{border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:11px;padding:9px 15px;font-size:13.5px;font-weight:600}
+  .btn:hover{border-color:var(--orange);color:var(--orange2)}
+  .btn.orange{background:linear-gradient(135deg,var(--orange),#ff5500);border:none;color:#fff}
+  .btn.small{padding:7px 11px;font-size:12.5px;border-radius:9px}
+  main{max-width:1220px;margin:0 auto;padding:20px 18px 70px}
+
+  .settings-row{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;
+    display:flex;gap:12px;flex-wrap:wrap;align-items:flex-end;margin-bottom:18px}
+  .settings-row .field{margin:0;flex:1;min-width:210px}
+  .settings-row .field.wide{flex:1.6}
+  .settings-row input{width:100%;background:#0b0b0e;border:1px solid var(--line);border-radius:12px;color:var(--text);padding:11px 13px;font-size:14px;outline:none}
+  .settings-row input:focus{border-color:var(--orange)}
+
+  .stats{display:grid;grid-template-columns:repeat(6,1fr);gap:12px;margin-bottom:24px}
+  @media(max-width:1000px){.stats{grid-template-columns:repeat(3,1fr)}}
+  @media(max-width:520px){.stats{grid-template-columns:repeat(2,1fr)}}
+  .stat{background:linear-gradient(180deg,var(--card2),var(--card));border:1px solid var(--line);border-radius:var(--radius);padding:16px 15px}
+  .stat .ic{font-size:19px;margin-bottom:8px}
+  .stat .num{font-size:27px;font-weight:800;line-height:1}
+  .stat .lbl{color:var(--muted);font-size:12px;margin-top:5px;text-transform:uppercase;letter-spacing:.5px}
+  .stat.hl .num{color:var(--orange2)}
+
+  section.block{margin-bottom:28px}
+  .block-head{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+  .block-head h2{font-size:18px}
+  .block-head h2 .cnt{color:var(--orange);font-size:14px}
+  .search-box{margin-left:auto;position:relative}
+  .search-box input{background:#0b0b0e;border:1px solid var(--line);border-radius:11px;color:var(--text);padding:10px 13px 10px 36px;font-size:14px;width:270px;max-width:72vw;outline:none}
+  .search-box input:focus{border-color:var(--orange)}
+  .search-box .si{position:absolute;left:12px;top:50%;transform:translateY(-50%);font-size:14px;opacity:.6}
+
+  .users{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:12px}
+  @media(max-width:420px){.users{grid-template-columns:1fr}}
+  .ucard{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:16px}
+  .ucard.blocked{border-color:rgba(255,77,94,.5)}
+  .u-top{display:flex;gap:12px;align-items:center}
+  .avatar{width:52px;height:52px;border-radius:50%;object-fit:cover;background:#23232c;flex:none;border:2px solid var(--line)}
+  .avatar-fallback{width:52px;height:52px;border-radius:50%;flex:none;display:flex;align-items:center;justify-content:center;
+    background:linear-gradient(135deg,#2a2a35,#1b1b22);border:2px solid var(--line);font-size:20px;font-weight:800;color:var(--orange2)}
+  .u-name{font-size:16px;font-weight:700;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .tick{color:var(--blue);font-size:15px}
+  .u-uname{color:var(--orange2);font-size:13.5px}
+  .u-email{color:var(--muted);font-size:12.5px;word-break:break-all}
+  .new-badge{background:var(--teal);color:#03211e;font-size:10px;font-weight:800;padding:2.5px 7px;border-radius:999px;letter-spacing:.4px}
+  .chips{display:flex;gap:6px;flex-wrap:wrap;margin-top:11px}
+  .chip{font-size:11px;padding:3.5px 9px;border-radius:999px;border:1px solid var(--line);color:var(--muted);background:#101014}
+  .chip.verified{color:#7db9ff;border-color:rgba(61,155,255,.5)}
+  .chip.blocked{color:#ff8b96;border-color:rgba(255,77,94,.55)}
+  .chip.key{color:#ffd28a;border-color:rgba(255,190,60,.45)}
+  .chip.mail{color:#8ef0c9;border-color:rgba(47,214,122,.4)}
+  .u-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px 14px;margin-top:13px;font-size:12.8px}
+  .u-grid .k{color:var(--muted)}
+  .u-grid .v{text-align:right;font-weight:600}
+  .u-bio{color:var(--muted);font-size:12.8px;margin-top:10px;font-style:italic;word-break:break-word}
+  .u-actions{display:flex;gap:7px;flex-wrap:wrap;margin-top:14px;border-top:1px solid var(--line);padding-top:13px}
+  .abtn{flex:1;min-width:64px;border:1px solid var(--line);background:var(--card2);color:var(--text);border-radius:9px;padding:8px 5px;font-size:12px;font-weight:600}
+  .abtn:hover{border-color:var(--orange)}
+  .abtn.danger{color:#ff8b96}
+  .abtn.danger:hover{border-color:var(--red)}
+  .abtn.warn{color:#ffd28a}
+
+  .posts{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:12px}
+  .pcard{background:var(--card);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .pcard img{width:100%;height:168px;object-fit:cover;display:block;background:#1b1b22}
+  .pcard .p-fallback{height:168px;display:flex;align-items:center;justify-content:center;font-size:34px;background:#1b1b22}
+  .p-in{padding:11px 12px}
+  .p-user{color:var(--orange2);font-size:13px;font-weight:700}
+  .p-cap{font-size:12.8px;color:#d8d8e0;margin-top:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:16px}
+  .p-meta{color:var(--muted);font-size:11.5px;margin-top:6px;display:flex;justify-content:space-between}
+  .p-del{width:100%;margin-top:9px;border:1px solid rgba(255,77,94,.4);background:rgba(255,77,94,.07);color:#ff8b96;border-radius:8px;padding:7px;font-size:12px;font-weight:600}
+  .p-del:hover{background:rgba(255,77,94,.16)}
+
+  .empty,.errbox{border:1px dashed var(--line);border-radius:var(--radius);padding:34px 18px;text-align:center;color:var(--muted);font-size:14.5px;background:rgba(255,255,255,.015)}
+  .errbox{border-color:rgba(255,77,94,.5);color:#ff9aa4}
+  .errbox b{display:block;font-size:16px;margin-bottom:6px;color:#ff8b96}
+  .loading{text-align:center;color:var(--muted);padding:38px 0;font-size:15px}
+  .spin{display:inline-block;width:19px;height:19px;border:3px solid var(--line);border-top-color:var(--orange);border-radius:50%;animation:sp 0.8s linear infinite;vertical-align:-4px;margin-right:9px}
+  @keyframes sp{to{transform:rotate(360deg)}}
+
+  #toasts{position:fixed;bottom:20px;left:50%;transform:translateX(-50%);z-index:99;display:flex;flex-direction:column;gap:8px;align-items:center;width:max-content;max-width:92vw}
+  .toast{background:#1d1d25;border:1px solid var(--line);color:var(--text);padding:11px 17px;border-radius:12px;font-size:13.5px;box-shadow:0 14px 34px rgba(0,0,0,.55);animation:tin .25s ease}
+  .toast.ok{border-color:rgba(47,214,122,.55)}
+  .toast.err{border-color:rgba(255,77,94,.6);color:#ff9aa4}
+  @keyframes tin{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:none}}
+</style>
+</head>
+<body>
+
+<!-- ================= LOGIN ================= -->
+<div id="loginScreen">
+  <div class="login-card" id="loginCard">
+    <div class="logo-badge">G</div>
+    <h1>Gram<span>Wasi</span> Admin</h1>
+    <p class="login-sub">Admin panel me ghusne ke liye login karo</p>
+    <div class="login-err" id="loginErr">Galat username ya password</div>
+    <form id="loginForm" autocomplete="off">
+      <div class="field">
+        <label for="liUser">Username</label>
+        <input id="liUser" type="text" placeholder="Username" required>
+      </div>
+      <div class="field">
+        <label for="liPass">Password</label>
+        <input id="liPass" type="password" placeholder="Password" required>
+      </div>
+      <button class="login-btn" type="submit">Login &#8594;</button>
+    </form>
+    <p class="login-note">Sirf admin ke liye &middot; GramWasi</p>
+  </div>
+</div>
+
+<!-- ================= DASHBOARD ================= -->
+<div id="dashScreen">
+  <header class="top">
+    <div class="top-in">
+      <div class="brand"><div class="logo-badge">G</div>Gram<span>Wasi</span>&nbsp;Admin</div>
+      <div class="status-pill"><span class="dot" id="statusDot"></span><span id="statusText">Server check ho raha hai…</span></div>
+      <div class="top-right">
+        <span class="auto-tag">Auto-refresh: ON (15s)</span>
+        <span class="updated" id="updatedAt">—</span>
+        <button class="btn small" id="refreshBtn" type="button">&#8635; Refresh</button>
+        <button class="btn small" id="logoutBtn" type="button">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <div class="settings-row">
+      <div class="field wide">
+        <label for="serverUrl">Server URL</label>
+        <input id="serverUrl" type="text" spellcheck="false">
+      </div>
+      <div class="field">
+        <label for="adminKey">Admin Key</label>
+        <input id="adminKey" type="text" spellcheck="false">
+      </div>
+      <button class="btn orange" id="saveSettingsBtn" type="button">Save &amp; Connect</button>
+    </div>
+
+    <div class="stats" id="statsRow">
+      <div class="stat hl"><div class="ic">👥</div><div class="num" id="stUsers">–</div><div class="lbl">Total Users</div></div>
+      <div class="stat"><div class="ic">🖼️</div><div class="num" id="stPosts">–</div><div class="lbl">Posts</div></div>
+      <div class="stat"><div class="ic">💬</div><div class="num" id="stMessages">–</div><div class="lbl">Messages</div></div>
+      <div class="stat"><div class="ic">⭕</div><div class="num" id="stStories">–</div><div class="lbl">Stories</div></div>
+      <div class="stat"><div class="ic">❤️</div><div class="num" id="stLikes">–</div><div class="lbl">Likes</div></div>
+      <div class="stat"><div class="ic">⏳</div><div class="num" id="stPending">–</div><div class="lbl">Pending Signups</div></div>
+    </div>
+
+    <section class="block">
+      <div class="block-head">
+        <h2>Users <span class="cnt" id="usersCount"></span></h2>
+        <div class="search-box"><span class="si">🔍</span><input id="userSearch" type="text" placeholder="Username, naam ya email search karo…"></div>
+      </div>
+      <div id="usersWrap"><div class="loading"><span class="spin"></span>Users load ho rahe hain…</div></div>
+    </section>
+
+    <section class="block">
+      <div class="block-head"><h2>Posts <span class="cnt" id="postsCount"></span></h2></div>
+      <div id="postsWrap"><div class="loading"><span class="spin"></span>Posts load ho rahe hain…</div></div>
+    </section>
+  </main>
+</div>
+
+<div id="toasts"></div>
+
+<script>
+/* ================= SHA-256 (pure JS, so login works on file:// too) ================= */
+var sha256=function a(b){function c(a,b){return a>>>b|a<<32-b}for(var d,e,f=Math.pow,g=f(2,32),h="length",i="",j=[],k=8*b[h],l=a.h=a.h||[],m=a.k=a.k||[],n=m[h],o={},p=2;64>n;p++)if(!o[p]){for(d=0;313>d;d+=p)o[d]=p;l[n]=f(p,.5)*g|0,m[n++]=f(p,1/3)*g|0}for(b+="\x80";b[h]%64-56;)b+="\x00";for(d=0;d<b[h];d++){if(e=b.charCodeAt(d),e>>8)return;j[d>>2]|=e<<(3-d)%4*8}for(j[j[h]]=k/g|0,j[j[h]]=k,e=0;e<j[h];){var q=j.slice(e,e+=16),r=l;for(l=l.slice(0,8),d=0;64>d;d++){var s=q[d-15],t=q[d-2],u=l[0],v=l[4],w=l[7]+=(c(v,6)^c(v,11)^c(v,25))+(v&l[5]^~v&l[6])+m[d]+(q[d]=16>d?q[d]:q[d-16]+(c(s,7)^c(s,18)^s>>>3)+q[d-7]+(c(t,17)^c(t,19)^t>>>10)|0),x=(c(u,2)^c(u,13)^c(u,22))+(u&l[1]^u&l[2]^l[1]&l[2]);l=[w+x|0].concat(l),l[4]=l[4]+w|0}for(d=0;8>d;d++)l[d]=l[d]+r[d]|0}for(d=0;8>d;d++)for(e=3;e+1;e--){var y=l[d]>>8*e&255;i+=(16>y?0:"")+y.toString(16)}return i};
+
+/* ================= LOGIN GATE ================= */
+/* Sirf password ka SHA-256 hash rakha hai — raw password file me kahin nahi hai. */
+var ADMIN_USER = "gramwasi";
+var ADMIN_PASS_HASH = "6af82ca2102049335ec42a7209ac4d9473ef3b43f8d92be1c3477bfefdad219e";
+
+var $ = function(id){ return document.getElementById(id); };
+
+function showDash(){
+  $("loginScreen").style.display = "none";
+  $("dashScreen").style.display = "block";
+  startPanel();
+}
+function showLogin(){
+  $("dashScreen").style.display = "none";
+  $("loginScreen").style.display = "flex";
+  stopPanel();
+}
+
+$("loginForm").addEventListener("submit", function(ev){
+  ev.preventDefault();
+  var u = $("liUser").value.trim().toLowerCase();
+  var p = $("liPass").value;
+  if (u === ADMIN_USER && sha256(p) === ADMIN_PASS_HASH) {
+    try { sessionStorage.setItem("gw_admin_ok", "1"); } catch(e){}
+    $("loginErr").classList.remove("show");
+    showDash();
+  } else {
+    $("loginErr").classList.add("show");
+    var card = $("loginCard");
+    card.classList.remove("shake"); void card.offsetWidth; card.classList.add("shake");
+  }
+});
+
+$("logoutBtn").addEventListener("click", function(){
+  try { sessionStorage.removeItem("gw_admin_ok"); } catch(e){}
+  showLogin();
+});
+
+/* ================= SETTINGS ================= */
+var DEFAULT_SERVER = "https://thunderous-lolly-b19730.netlify.app";
+var DEFAULT_KEY = "";
+
+function serverBase(){
+  var v = ($("serverUrl").value || "").trim().replace(/\/+$/, "");
+  return v || DEFAULT_SERVER;
+}
+function adminKeyVal(){
+  return ($("adminKey").value || "").trim() || DEFAULT_KEY;
+}
+function loadSettings(){
+  var s = "", k = "";
+  try { s = localStorage.getItem("gw_admin_server") || ""; k = localStorage.getItem("gw_admin_key") || ""; } catch(e){}
+  $("serverUrl").value = s || DEFAULT_SERVER;
+  $("adminKey").value = k || DEFAULT_KEY;
+}
+$("saveSettingsBtn").addEventListener("click", function(){
+  try {
+    localStorage.setItem("gw_admin_server", serverBase());
+    localStorage.setItem("gw_admin_key", adminKeyVal());
+  } catch(e){}
+  toast("Settings save ho gaye — reconnect ho raha hai", "ok");
+  refreshAll();
+});
+
+/* ================= HELPERS ================= */
+function esc(s){
+  return String(s == null ? "" : s).replace(/[&<>"']/g, function(ch){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch];
+  });
+}
+function toast(msg, kind){
+  var t = document.createElement("div");
+  t.className = "toast" + (kind ? " " + kind : "");
+  t.textContent = msg;
+  $("toasts").appendChild(t);
+  setTimeout(function(){ t.style.opacity = "0"; t.style.transition = "opacity .3s"; setTimeout(function(){ t.remove(); }, 320); }, 3400);
+}
+function fmtDate(ts){
+  if (!ts) return "—";
+  var d = new Date(ts);
+  if (isNaN(d.getTime())) return "—";
+  return d.toLocaleDateString("en-IN", {day:"numeric", month:"short", year:"numeric"}) +
+         " · " + d.toLocaleTimeString("en-IN", {hour:"numeric", minute:"2-digit"});
+}
+function resolveImg(src){
+  if (!src) return "";
+  if (/^(https?:|data:|blob:)/i.test(src)) return src;
+  if (src.charAt(0) === "/") return serverBase() + src;
+  return src;
+}
+function initialsAvatar(name){
+  var ch = (String(name || "?").trim().charAt(0) || "?").toUpperCase();
+  return '<div class="avatar-fallback">' + esc(ch) + '</div>';
+}
+window.__avFb = function(n){ return '<div class="avatar-fallback">' + esc((n || "?").charAt(0).toUpperCase()) + '</div>'; };
+function avatarHtml(u){
+  var src = resolveImg(u.avatar);
+  if (src) return '<img class="avatar" src="' + esc(src) + '" alt="" onerror="this.outerHTML=window.__avFb(\'' + esc((u.name || u.username || "?")) + '\')">';
+  return initialsAvatar(u.name || u.username);
+}
+
+async function apiGet(path, useKey){
+  var headers = {};
+  if (useKey) headers["x-admin-key"] = adminKeyVal();
+  var r = await fetch(serverBase() + path, { headers: headers });
+  if (!r.ok) throw new Error("HTTP " + r.status);
+  return r.json();
+}
+async function apiPost(path, body){
+  var r = await fetch(serverBase() + path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-admin-key": adminKeyVal() },
+    body: JSON.stringify(body || {})
+  });
+  var j = {};
+  try { j = await r.json(); } catch(e){}
+  if (!r.ok) throw new Error(j.error || ("HTTP " + r.status));
+  return j;
+}
+
+/* ================= DATA ================= */
+var state = { users: [], posts: [], stats: null, health: null, loading: false, timer: null, firstLoad: true };
+
+function renderHealth(){
+  var dot = $("statusDot"), txt = $("statusText");
+  if (state.health && state.health.ok) {
+    dot.className = "dot on";
+    txt.textContent = "Server Live · Storage: " + (state.health.storage || "?") +
+      (state.health.telegramStorage ? " · Telegram ON" : "");
+  } else {
+    dot.className = "dot off";
+    txt.textContent = "Server se connect nahi ho raha";
+  }
+}
+function renderStats(){
+  var s = state.stats || {};
+  $("stUsers").textContent    = (s.users != null ? s.users : "–");
+  $("stPosts").textContent    = (s.posts != null ? s.posts : "–");
+  $("stMessages").textContent = (s.messages != null ? s.messages : "–");
+  $("stStories").textContent  = (s.stories != null ? s.stories : "–");
+  $("stLikes").textContent    = (s.likes != null ? s.likes : "–");
+  $("stPending").textContent  = (s.pendingSignups != null ? s.pendingSignups : "–");
+}
+function filteredUsers(){
+  var q = ($("userSearch").value || "").trim().toLowerCase();
+  var list = state.users.slice().sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+  if (!q) return list;
+  return list.filter(function(u){
+    return (u.username || "").toLowerCase().indexOf(q) >= 0 ||
+           (u.name || "").toLowerCase().indexOf(q) >= 0 ||
+           (u.email || "").toLowerCase().indexOf(q) >= 0;
+  });
+}
+function renderUsers(){
+  var wrap = $("usersWrap");
+  var list = filteredUsers();
+  $("usersCount").textContent = "(" + list.length + (list.length !== state.users.length ? " / " + state.users.length : "") + ")";
+  if (!state.users.length) {
+    wrap.innerHTML = '<div class="empty">Abhi koi user nahi hai. Jab log app me signup karenge to yahan live dikhenge.</div>';
+    return;
+  }
+  if (!list.length) {
+    wrap.innerHTML = '<div class="empty">Is search se koi user nahi mila.</div>';
+    return;
+  }
+  var now = Date.now();
+  wrap.innerHTML = '<div class="users">' + list.map(function(u){
+    var isNew = u.createdAt && (now - u.createdAt) < 24 * 3600 * 1000;
+    var chips = "";
+    if (isNew) chips += '<span class="new-badge">NEW</span>';
+    if (u.verified) chips += '<span class="chip verified">✔ Verified</span>';
+    if (u.blocked) chips += '<span class="chip blocked">🚫 Blocked</span>';
+    if (u.hasKey) chips += '<span class="chip key">🔒 E2EE Key</span>';
+    if (u.emailVerified) chips += '<span class="chip mail">✉ Email Verified</span>';
+    var followers = (u.followers != null ? u.followers : (u.followerList ? u.followerList.length : 0));
+    var following = (u.following != null ? u.following : (u.followingList ? u.followingList.length : 0));
+    return '<div class="ucard' + (u.blocked ? " blocked" : "") + '">' +
+      '<div class="u-top">' + avatarHtml(u) +
+        '<div style="min-width:0">' +
+          '<div class="u-name">' + esc(u.name || u.username) + (u.verified ? ' <span class="tick">✔</span>' : '') + '</div>' +
+          '<div class="u-uname">@' + esc(u.username) + '</div>' +
+          '<div class="u-email">' + esc(u.email || "—") + '</div>' +
+        '</div>' +
+      '</div>' +
+      (chips ? '<div class="chips">' + chips + '</div>' : '') +
+      (u.bio ? '<div class="u-bio">&ldquo;' + esc(u.bio) + '&rdquo;</div>' : '') +
+      '<div class="u-grid">' +
+        '<span class="k">Joined</span><span class="v">' + fmtDate(u.createdAt) + '</span>' +
+        '<span class="k">Last login</span><span class="v">' + fmtDate(u.lastLoginAt) + '</span>' +
+        '<span class="k">Followers</span><span class="v">' + followers + '</span>' +
+        '<span class="k">Following</span><span class="v">' + following + '</span>' +
+        '<span class="k">Posts</span><span class="v">' + (u.postCount != null ? u.postCount : 0) + '</span>' +
+        '<span class="k">Messages</span><span class="v">' + (u.messageCount != null ? u.messageCount : 0) + '</span>' +
+      '</div>' +
+      '<div class="u-actions">' +
+        '<button class="abtn" data-act="verify" data-un="' + esc(u.username) + '" data-cur="' + (u.verified ? "1" : "0") + '">' + (u.verified ? "✔ Tick hatao" : "✔ Verify") + '</button>' +
+        '<button class="abtn warn" data-act="block" data-un="' + esc(u.username) + '" data-cur="' + (u.blocked ? "1" : "0") + '">' + (u.blocked ? "Unblock" : "🚫 Block") + '</button>' +
+        '<button class="abtn" data-act="reset" data-un="' + esc(u.username) + '">🔑 Password</button>' +
+        '<button class="abtn danger" data-act="del" data-un="' + esc(u.username) + '">🗑 Delete</button>' +
+      '</div>' +
+    '</div>';
+  }).join("") + '</div>';
+
+  wrap.querySelectorAll("[data-act]").forEach(function(btn){
+    btn.addEventListener("click", function(){ userAction(btn.getAttribute("data-act"), btn.getAttribute("data-un"), btn.getAttribute("data-cur") === "1"); });
+  });
+}
+function renderPosts(){
+  var wrap = $("postsWrap");
+  $("postsCount").textContent = "(" + state.posts.length + ")";
+  if (!state.posts.length) {
+    wrap.innerHTML = '<div class="empty">Abhi koi post nahi hai.</div>';
+    return;
+  }
+  var list = state.posts.slice().sort(function(a, b){ return (b.createdAt || 0) - (a.createdAt || 0); });
+  wrap.innerHTML = '<div class="posts">' + list.map(function(p){
+    var img = resolveImg(p.image);
+    var likes = Array.isArray(p.likes) ? p.likes.length : (p.likes || 0);
+    var comments = Array.isArray(p.comments) ? p.comments.length : (p.comments || 0);
+    return '<div class="pcard">' +
+      (img ? '<img src="' + esc(img) + '" alt="" loading="lazy" onerror="this.outerHTML=\'<div class=&quot;p-fallback&quot;>🖼️</div>\'">'
+           : '<div class="p-fallback">🖼️</div>') +
+      '<div class="p-in">' +
+        '<div class="p-user">@' + esc(p.user || p.username || "?") + '</div>' +
+        '<div class="p-cap">' + esc(p.caption || "") + '</div>' +
+        '<div class="p-meta"><span>❤️ ' + likes + ' · 💬 ' + comments + '</span><span>' + fmtDate(p.createdAt).split(" · ")[0] + '</span></div>' +
+        '<button class="p-del" data-pid="' + esc(p.id) + '">🗑 Post Delete</button>' +
+      '</div>' +
+    '</div>';
+  }).join("") + '</div>';
+
+  wrap.querySelectorAll("[data-pid]").forEach(function(btn){
+    btn.addEventListener("click", function(){ deletePost(btn.getAttribute("data-pid")); });
+  });
+}
+function renderError(msg){
+  var html = '<div class="errbox"><b>⚠ Server se data nahi aaya</b>' + esc(msg) +
+    '<br><br>Server URL aur Admin Key upar settings me check karo, phir Refresh dabao.<br>Ye panel sirf LIVE data dikhata hai — koi demo data nahi hai.</div>';
+  $("usersWrap").innerHTML = html;
+  $("postsWrap").innerHTML = html;
+}
+
+/* ================= ACTIONS ================= */
+async function userAction(act, un, cur){
+  try {
+    if (act === "verify") {
+      await apiPost("/api/admin/verify", { username: un, verified: !cur });
+      toast("@" + un + (cur ? " ka blue tick hat gaya" : " ko blue tick mil gaya ✔"), "ok");
+    } else if (act === "block") {
+      if (!cur && !confirm("@" + un + " ko BLOCK karna hai? Wo app use nahi kar payega.")) return;
+      await apiPost("/api/admin/block", { username: un, blocked: !cur });
+      toast("@" + un + (cur ? " unblock ho gaya" : " block ho gaya 🚫"), "ok");
+    } else if (act === "reset") {
+      var np = prompt("@" + un + " ke liye NAYA password likho (kam se kam 4 character):");
+      if (np === null) return;
+      np = String(np);
+      if (np.length < 4) { toast("Password bahut chhota hai — kam se kam 4 character", "err"); return; }
+      var cp = prompt("Confirm — wahi naya password dobara likho:");
+      if (cp === null) return;
+      if (cp !== np) { toast("Dono password match nahi hue", "err"); return; }
+      await apiPost("/api/admin/reset-password", { username: un, newPassword: np });
+      toast("@" + un + " ka password badal gaya 🔑", "ok");
+    } else if (act === "del") {
+      if (!confirm("⚠ @" + un + " ka account DELETE karna hai?\nUske posts, followers sab hat jayenge. Ye wapas nahi hoga.")) return;
+      var typed = prompt('Pakka karne ke liye username bilkul waisa hi likho: "' + un + '"');
+      if (typed === null) return;
+      if (String(typed).trim() !== un) { toast("Username match nahi hua — delete cancel", "err"); return; }
+      await apiPost("/api/admin/delete-user", { username: un });
+      toast("@" + un + " delete ho gaya 🗑", "ok");
+    }
+    refreshAll();
+  } catch (e) {
+    toast("Galti: " + e.message, "err");
+  }
+}
+async function deletePost(pid){
+  if (!confirm("Ye post DELETE karna hai? Ye wapas nahi hoga.")) return;
+  try {
+    await apiPost("/api/admin/delete-post", { postId: isNaN(Number(pid)) ? pid : Number(pid) });
+    toast("Post delete ho gaya 🗑", "ok");
+    refreshAll();
+  } catch (e) {
+    toast("Galti: " + e.message, "err");
+  }
+}
+
+/* ================= REFRESH ================= */
+async function refreshAll(){
+  if (state.loading) return;
+  state.loading = true;
+  try {
+    var health = null;
+    try { health = await apiGet("/health", false); } catch(e){}
+    state.health = health;
+    renderHealth();
+
+    var results = await Promise.all([
+      apiGet("/api/admin/stats", true),
+      apiGet("/api/admin/users", true),
+      apiGet("/api/posts", false)
+    ]);
+    state.stats = results[0];
+    state.users = (results[1] && results[1].users) || [];
+    state.posts = (results[2] && results[2].posts) || [];
+    renderStats(); renderUsers(); renderPosts();
+    state.firstLoad = false;
+    $("updatedAt").textContent = "Last updated: " + new Date().toLocaleTimeString("en-IN", {hour:"numeric", minute:"2-digit", second:"2-digit"});
+  } catch (e) {
+    renderHealth();
+    if (state.firstLoad) { renderError(e.message); state.firstLoad = false; }
+    else toast("Refresh fail: " + e.message, "err");
+  } finally {
+    state.loading = false;
+  }
+}
+function startPanel(){
+  loadSettings();
+  refreshAll();
+  if (state.timer) clearInterval(state.timer);
+  state.timer = setInterval(refreshAll, 15000);
+}
+function stopPanel(){
+  if (state.timer) { clearInterval(state.timer); state.timer = null; }
+}
+
+$("refreshBtn").addEventListener("click", refreshAll);
+$("userSearch").addEventListener("input", renderUsers);
+
+/* ================= BOOT ================= */
+loadSettings();
+try {
+  if (sessionStorage.getItem("gw_admin_ok") === "1") showDash();
+} catch(e){}
+</script>
+</body>
+</html>
