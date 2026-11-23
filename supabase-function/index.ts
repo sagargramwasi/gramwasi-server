@@ -116,6 +116,122 @@ function seedData() {
   ensureSeedReels(d);
   return d;
 }
+
+// ===== v15: 100 wallpaper + bhagwan posts (ek baar seed) =====
+const WP15 = [
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0c/Attributed_to_Khushala%2C_Indian%2C_active_late_18th_century_-_The_Gods_Sing_and_Dance_for_Shiva_and_Parvati_-_Google_Art_Project.jpg/960px-Attributed_to_Khushala%2C_Indian%2C_active_late_18th_century_-_The_Gods_Sing_and_Dance_for_Shiva_and_Parvati_-_Google_Art_Project.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🕉️ Mahadev ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/1/15/The_Goddess_Bhairavi_Devi_with_Shiva_MET_DP257990.jpg/960px-The_Goddess_Bhairavi_Devi_with_Shiva_MET_DP257990.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🕉️ Mahadev ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/5/51/Shiva_Painting_1.jpg/960px-Shiva_Painting_1.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🕉️ Mahadev ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/6/6e/Krishna_Holds_Up_Mount_Govardhan_to_Shelter_the_Villagers_of_Braj%2C_ca.1590%E2%80%9395%2C_The_Met.jpg/960px-Krishna_Holds_Up_Mount_Govardhan_to_Shelter_the_Villagers_of_Braj%2C_ca.1590%E2%80%9395%2C_The_Met.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🪔 Shri Krishna ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Dasavataralu_-_Krishna_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg/960px-Dasavataralu_-_Krishna_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🪔 Shri Krishna ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a0/Maker_unknown%2C_India_-_Krishna_and_Radha_-_Google_Art_Project.jpg/960px-Maker_unknown%2C_India_-_Krishna_and_Radha_-_Google_Art_Project.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🪔 Shri Krishna ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/a/a8/Ganesha_Painting_at_a_Temple_in_Bhadrachalam.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🙏 Ganpati Bappa ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/2/27/Ganesha_Sarasvati_Poona_painting_1800-05.jpg/960px-Ganesha_Sarasvati_Poona_painting_1800-05.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Ganpati Bappa ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e0/Painting_of_Ganesha_at_Bhimbetka.jpg/960px-Painting_of_Ganesha_at_Bhimbetka.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Ganpati Bappa ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/f/ff/Unknown_%28Indian%29_-_Durga_-_71.305_-_Detroit_Institute_of_Arts.jpg/960px-Unknown_%28Indian%29_-_Durga_-_71.305_-_Detroit_Institute_of_Arts.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🔱 Maa Durga ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a2/Unknown_%28Indian%29_-_Durga_-_71.306_-_Detroit_Institute_of_Arts.jpg/960px-Unknown_%28Indian%29_-_Durga_-_71.306_-_Detroit_Institute_of_Arts.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🔱 Maa Durga ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/4/4a/Painting_of_Durga%2C_1820.jpg/960px-Painting_of_Durga%2C_1820.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🔱 Maa Durga ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/Hanuman_painting_c1920.jpg/960px-Hanuman_painting_c1920.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Bajrangbali ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/d/d7/Rama_and_Hanuman_fighting_Ravana%2C_an_album_painting_on_paper%2C_c1820.jpg/960px-Rama_and_Hanuman_fighting_Ravana%2C_an_album_painting_on_paper%2C_c1820.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Bajrangbali ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7d/Painting_depicting_Hanuman%2C_Durga%2C_and_Bhairava.jpg/960px-Painting_depicting_Hanuman%2C_Durga%2C_and_Bhairava.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Bajrangbali ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1c/Dasavataralu_-_Rama_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg/960px-Dasavataralu_-_Rama_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🏹 Shri Ram ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/1/19/RAMA_SITA_-OIL_PAINTING_BY_RAJASEKHARAN.jpg/960px-RAMA_SITA_-OIL_PAINTING_BY_RAJASEKHARAN.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🏹 Shri Ram ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/Rama_Zadi_Temple_%2801%29.jpg/960px-Rama_Zadi_Temple_%2801%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🏹 Shri Ram ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/7/79/Siddha_Lakshmi_-_Google_Art_Project.jpg/960px-Siddha_Lakshmi_-_Google_Art_Project.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🪔 Maa Lakshmi ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/8/8d/Nathdwara_Painting_showing_Sheshayi_Vishnu_and_Lakshmi%2C_provenance_unknown%2C_Government_Museum_and_Art_Gallery%2C_Chandigarh.jpg/960px-Nathdwara_Painting_showing_Sheshayi_Vishnu_and_Lakshmi%2C_provenance_unknown%2C_Government_Museum_and_Art_Gallery%2C_Chandigarh.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🪔 Maa Lakshmi ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/a/a6/Raja_Ravi_Varma%2C_Goddess_Lakshmi%2C_1896.jpg/960px-Raja_Ravi_Varma%2C_Goddess_Lakshmi%2C_1896.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🪔 Maa Lakshmi ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/1/1a/Raja_Ravi_Varma%2C_Goddess_Saraswati.jpg/960px-Raja_Ravi_Varma%2C_Goddess_Saraswati.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🎵 Maa Saraswati ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/3/30/Saraswati_Pata.jpg/960px-Saraswati_Pata.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🎵 Maa Saraswati ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/3/31/Goddess_Saraswati_-_Raja_Ravi_Varma.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🎵 Maa Saraswati ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3c/Dasavataralu_-_The_Main_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg/960px-Dasavataralu_-_The_Main_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Shri Vishnu ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e1/India%2C_Calcutta%2C_Kalighat_painting%2C_19th_century_-_Trivikramapada_%28Three_Steps_of_Vishnu%29_-_2003.165_-_Cleveland_Museum_of_Art.jpg/960px-India%2C_Calcutta%2C_Kalighat_painting%2C_19th_century_-_Trivikramapada_%28Three_Steps_of_Vishnu%29_-_2003.165_-_Cleveland_Museum_of_Art.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Shri Vishnu ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b0/Dasavataralu_-_Varaha_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg/960px-Dasavataralu_-_Varaha_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Shri Vishnu ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/b/b3/India%2C_Calcutta%2C_Kalighat_painting%2C_19th_century_-_Kali_-_2003.163_-_Cleveland_Museum_of_Art.jpg/960px-India%2C_Calcutta%2C_Kalighat_painting%2C_19th_century_-_Kali_-_2003.163_-_Cleveland_Museum_of_Art.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🔱 Maa Kali ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/4/47/Kalighat_pictures_sep_sheets_81.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🔱 Maa Kali ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/c/c4/Unidentified_-_Kali_-_2021.344_-_Metropolitan_Museum_of_Art.jpg/960px-Unidentified_-_Kali_-_2021.344_-_Metropolitan_Museum_of_Art.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🔱 Maa Kali ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/3/33/Fresco_depicting_Kartikeya_from_the_Veer_Bhan_Da_Shivala%2C_Amritsar%2C_circa_late-19th_century.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🙏 Kartikeya ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/3/3b/Kartikeya.jpg/960px-Kartikeya.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Kartikeya ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/8/89/Skanda_Kartikeya.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🙏 Kartikeya ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9c/Radha_and_Krishna_in_the_boat_of_love_-_Google_Art_Project.jpg/960px-Radha_and_Krishna_in_the_boat_of_love_-_Google_Art_Project.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "💙 Radha Krishna ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9d/Radha%2C_Krishna_and_the_gopis%2C_Bharatiya_Lok_Kala_Museum%2C_Udaipur%2C_India.jpg/960px-Radha%2C_Krishna_and_the_gopis%2C_Bharatiya_Lok_Kala_Museum%2C_Udaipur%2C_India.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "💙 Radha Krishna ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/7/73/Radha-_Krishna%2C_Kalighat_Painting.jpg/960px-Radha-_Krishna%2C_Kalighat_Painting.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "💙 Radha Krishna ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/5/50/Deities_enshrined_in_the_Jagannath_Temple.jpg/960px-Deities_enshrined_in_the_Jagannath_Temple.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Jagannath ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/6/62/Lord_Jagannath_Patachitra.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🙏 Jagannath ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/d/db/Balarama%2C_Subhadra_and_Jagannath_in_the_temple_at_Puri%2C_with_Wellcome_V0017732.jpg/960px-Balarama%2C_Subhadra_and_Jagannath_in_the_temple_at_Puri%2C_with_Wellcome_V0017732.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Jagannath ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/2/2e/Sai_Baba_by_Mr._Vasant_A_Mali.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🙏 Sai Baba ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/7/7b/Sai_baba_side_view.jpg/960px-Sai_baba_side_view.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Sai Baba ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/Kuang_Chee_Tng_Buddhist%2C_Moulmein_Church_of_Christ_%26_Sathya_Sai_Baba_Centre.jpg/960px-Kuang_Chee_Tng_Buddhist%2C_Moulmein_Church_of_Christ_%26_Sathya_Sai_Baba_Centre.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Sai Baba ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/1/11/Information_board_at_Venkateswara_Temple_in_Midhilapuri_VUDA_colony.JPG/960px-Information_board_at_Venkateswara_Temple_in_Midhilapuri_VUDA_colony.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Tirupati Balaji ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/e/e4/Dasavataralu_-Gautam_Buddha_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg/960px-Dasavataralu_-Gautam_Buddha_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Tirupati Balaji ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/7/76/Dasavataralu_-_Matsya_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg/960px-Dasavataralu_-_Matsya_avatar_of_Lord_Vishnu_on_Sri_Venkateshwara_temple%2C_Guntur.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🙏 Tirupati Balaji ✨ #bhakti #god #wallpaper"],
+["https://upload.wikimedia.org/wikipedia/commons/d/df/Thomas_Daniell_%281749-1840%29_-_Puja_Performed_at_a_Temple_of_Shiva_-_732154_-_National_Trust.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail_unscaled", "🛕 Shiv Mandir ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/9/92/Shiva_temples_Dhakeshwari_Mandir_2_by_Ragib_Hasan.jpg/960px-Shiva_temples_Dhakeshwari_Mandir_2_by_Ragib_Hasan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🛕 Shiv Mandir ✨ #bhakti #god #wallpaper"],
+["https://thumb.wikimedia.org/wikipedia/commons/thumb/7/72/Thiruneelakudi_-_Shiva_painting_in_the_wall.JPG/960px-Thiruneelakudi_-_Shiva_painting_in_the_wall.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail", "🛕 Shiv Mandir ✨ #bhakti #god #wallpaper"],
+["https://picsum.photos/seed/gwwp1/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp2/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp3/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp4/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp5/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp6/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp7/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp8/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp9/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp10/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp11/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp12/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp13/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp14/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp15/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp16/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp17/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp18/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp19/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp20/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp21/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp22/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp23/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp24/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp25/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp26/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp27/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp28/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp29/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp30/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp31/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp32/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp33/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp34/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp35/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp36/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp37/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp38/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp39/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp40/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp41/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp42/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp43/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp44/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp45/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp46/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp47/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp48/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp49/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp50/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp51/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"],
+["https://picsum.photos/seed/gwwp52/720/1280", "🌄 Beautiful Wallpaper ✨ #wallpaper #nature #hd"]
+];
+function ensureWallpaperSeeds() {
+  try {
+    if (!dbHasData || db.wpSeededV15) return;
+    db.wpSeededV15 = true;
+    const now = Date.now();
+    WP15.forEach(function (w, i) {
+      db.posts.push({ id: 'wp15_' + (i + 1), user: 'gramwasi', image: w[0], video: null,
+        caption: w[1], likes: 0, likedBy: [], comments: [], seed: true, createdAt: now - i * 60000 });
+    });
+    saveDb();
+  } catch (e) { console.warn('[wp15] seed fail:', (e && e.message) || e); }
+}
 function normalizeDb(d) {
   const out = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
   if (d && typeof d === 'object') {
@@ -127,6 +243,7 @@ function normalizeDb(d) {
     if (Array.isArray(d.reports)) out.reports = d.reports;
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
+    if (d.wpSeededV15 === true) out.wpSeededV15 = true;
   }
   out.posts.forEach(migratePost);
   ensureSeedReels(out);
@@ -474,6 +591,7 @@ async function handleRequest(req, res) {
   if (req.method === 'OPTIONS') { send(res, 200, {}); return; }
 
   await ensureDb();
+  ensureWallpaperSeeds();
   await refreshIfStale(p, req.method);
 
   // Serve admin panel at /admin if the file sits next to the server folder
@@ -977,9 +1095,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 14, min: 14,
+      return send(res, 200, { ok: true, latest: 15, min: 15,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Naya server — online dot, story like, popular reels sab chalu. Update karke hi app chalega.' });
+        notes: 'v15 — Messages fix: requests, tez chat, Instagram wala blue tick, 100 naye wallpapers. Update karke hi app chalega.' });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
@@ -1080,11 +1198,6 @@ async function handleRequest(req, res) {
 }
 
 const server = http.createServer(handleRequest);
-
-ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
-ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
-
-ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
 
 // ============================================================================
 // ===== Fetch adapter: Supabase Edge Function <-> Node-style handleRequest ====
