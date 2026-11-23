@@ -496,6 +496,7 @@ function pub(u) {
     publicKey: u.publicKey || null,
     verified: u.verified, blocked: u.blocked,
     lastSeen: typeof u.lastSeen === 'number' ? u.lastSeen : 0,
+    crownUntil: typeof u.crownUntil === 'number' ? u.crownUntil : 0,
     followers: (u.followers || []).length, following: (u.following || []).length,
     followerList: u.followers || [], followingList: u.following || [] };
 }
@@ -885,6 +886,26 @@ async function handleRequest(req, res) {
       await saveDb();
       return send(res, 200, { ok: true, liked, likes: story.likes.length });
     }
+    if (p === '/api/crown' && req.method === 'POST') {
+      // Game series jeetne par Taj: user par 10 minute ke liye crown.
+      // Followers/following ko users list (pub) se har jagah dikhega.
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      u.crownUntil = Date.now() + 10 * 60 * 1000;
+      await saveDb();
+      return send(res, 200, { ok: true, crownUntil: u.crownUntil });
+    }
+    if (p === '/api/chat/clear-game' && req.method === 'POST') {
+      // Naya game shuru hone par purane saare ttt: messages dono taraf se saaf.
+      const a = String(body.user || ''), b = String(body.with || '');
+      if (!a || !b) return send(res, 400, { error: 'user/with chahiye' });
+      db.messages = db.messages || [];
+      const before = db.messages.length;
+      db.messages = db.messages.filter(m => !(((m.from === a && m.to === b) || (m.from === b && m.to === a)) && typeof m.text === 'string' && m.text.indexOf('ttt:') === 0));
+      const removed = before - db.messages.length;
+      if (removed) await saveDb();
+      return send(res, 200, { ok: true, removed });
+    }
     if (p === '/api/keys' && req.method === 'POST') {
       // End-to-end encryption: user ki PUBLIC key server par rakhi jati hai.
       // Private key sirf user ke phone par rehti hai — server (aur Telegram
@@ -1157,9 +1178,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 19, min: 19,
+      return send(res, 200, { ok: true, latest: 20, min: 20,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v19 — Chat me Billi Panja (double-tap), sound effects aur 3-round Tic-Tac-Toe with Taj. Update karke hi app chalega.' });
+        notes: 'v20 — Game ke Taj ab sabko dikhega, New Game par purane game saaf, story like aur saaf. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
