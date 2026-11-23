@@ -103,6 +103,7 @@ let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liy
 let lastLoadAt = 0;    // aakhri successful load/save ka time (ms)
 let pendingSaves = 0;  // chal rahe Supabase saves ki ginti
 let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
+let dbLoadOk = false;  // Supabase se ASAL data load hua hai — jab tak false, ye instance save NAHI karega (blind instance kabhi asli data overwrite nahi kar sakta)
 
 function seedData() {
   const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
@@ -223,6 +224,7 @@ const WP15 = [
 function ensureWallpaperSeeds() {
   try {
     if (!dbHasData || db.wpSeededV15) return;
+    if (SUPABASE_ON && !dbLoadOk) return;
     db.wpSeededV15 = true;
     const now = Date.now();
     WP15.forEach(function (w, i) {
@@ -317,8 +319,9 @@ async function sbLoad() {
     headers: { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, signal: sbSignal() });
   if (!r.ok) throw new Error('Supabase load HTTP ' + r.status);
   const rows = await r.json();
+  if (Array.isArray(rows) && rows.length === 0) return null; // row hi nahi — sirf pehli boot par hota hai
   if (Array.isArray(rows) && rows[0] && rows[0].data && Array.isArray(rows[0].data.users)) return rows[0].data;
-  return null;
+  throw new Error('Supabase load: unexpected response shape');
 }
 async function sbSave() {
   const headers = { apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY, 'Content-Type': 'application/json' };
@@ -345,8 +348,13 @@ async function loadDb(force) {
     try {
       if (SUPABASE_ON) {
         const data = await sbLoad();
-        if (data) { db = normalizeDb(data); sbHasRow = true; }
-        else { db = seedData(); await sbSave(); }
+        if (data) { db = normalizeDb(data); sbHasRow = true; dbLoadOk = true; }
+        else {
+          // Row sach me maujud nahi (sirf bilkul nayi pehli boot) — tab hi
+          // seed banao. dbLoadOk yahin true hoga kyunki khali jagah par
+          // likhna surakshit hai; maujud data ko ye raasta kabhi nahi chhuta.
+          db = seedData(); dbLoadOk = true; await sbSave();
+        }
       } else {
         const data = fileLoad();
         if (data) db = normalizeDb(data);
@@ -355,9 +363,12 @@ async function loadDb(force) {
       dbHasData = true;
       lastLoadAt = Date.now();
     } catch (e) {
-      // Storage fail ho jaye to request crash nahi hona chahiye — in-memory/seed DB se kaam chalao
+      // Storage fail ho jaye to request crash nahi hona chahiye. Supabase mode
+      // me fail ka matlab hai ye instance ANDHA hai: khali DB se jawab do,
+      // par saveDb ka guard (dbLoadOk=false) iski koi bhi save rok dega —
+      // asli data kabhi overwrite nahi hoga. File mode me seed chalega.
       console.warn('[storage] load fail, in-memory DB se continue:', (e && e.message) || e);
-      if (!dbHasData) { db = seedData(); dbHasData = true; }
+      if (!dbHasData) { db = SUPABASE_ON ? { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 } : seedData(); dbHasData = true; }
     } finally { dbReady = true; dbLoading = null; }
   })();
   return dbLoading;
@@ -409,6 +420,7 @@ async function refreshBeforeMutation() {
 }
 async function saveDb() {
   if (!SUPABASE_ON) { fileSave(); return; }
+  if (!dbLoadOk) { console.warn('[storage] save roka gaya — is instance ne asli data load hi nahi kiya (blind save se data ud sakta hai)'); return; }
   pendingSaves++;
   try { await sbSave(); lastLoadAt = Date.now(); }
   catch (e) { console.warn('[storage] save fail:', (e && e.message) || e); }
