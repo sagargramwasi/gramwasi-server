@@ -96,7 +96,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
-let db = { users: [], posts: [], messages: [], stories: [], notifications: [], seq: 1 };
+let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
 let dbReady = false;   // pehli load koshish ho chuki hai
 let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
 let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
@@ -105,7 +105,7 @@ let pendingSaves = 0;  // chal rahe Supabase saves ki ginti
 let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
 
 function seedData() {
-  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], seq: 1 };
+  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
@@ -117,13 +117,14 @@ function seedData() {
   return d;
 }
 function normalizeDb(d) {
-  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], seq: 1 };
+  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
   if (d && typeof d === 'object') {
     if (Array.isArray(d.users)) out.users = d.users;
     if (Array.isArray(d.posts)) out.posts = d.posts;
     if (Array.isArray(d.messages)) out.messages = d.messages;
     if (Array.isArray(d.stories)) out.stories = d.stories;
     if (Array.isArray(d.notifications)) out.notifications = d.notifications;
+    if (Array.isArray(d.reports)) out.reports = d.reports;
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
   }
@@ -846,6 +847,24 @@ async function handleRequest(req, res) {
       post.comments.push({ username: me.username, text: String(body.text), at: Date.now() });
       await saveDb(); return send(res, 200, { comments: post.comments });
     }
+    if (p === '/api/posts/delete' && req.method === 'POST') {
+      // Apni post delete: sirf post ka malik hi hata sakta hai.
+      const post = db.posts.find(x => String(x.id) === String(body.postId));
+      const me = byName(body.username);
+      if (!post || !me) return send(res, 404, { error: 'post ya user nahi mila' });
+      if (post.username !== me.username) return send(res, 403, { error: 'ye tumhari post nahi hai' });
+      db.posts = db.posts.filter(x => x !== post);
+      db.reports = (db.reports || []).filter(r => String(r.postId) !== String(post.id));
+      await saveDb(); return send(res, 200, { ok: true });
+    }
+    if (p === '/api/posts/report' && req.method === 'POST') {
+      const post = db.posts.find(x => String(x.id) === String(body.postId));
+      const me = byName(body.username);
+      if (!post || !me) return send(res, 404, { error: 'post ya user nahi mila' });
+      if (!Array.isArray(db.reports)) db.reports = [];
+      db.reports.push({ id: db.seq++, postId: post.id, postUser: post.username, by: me.username, reason: String(body.reason || 'Other').slice(0, 60), at: Date.now() });
+      await saveDb(); return send(res, 200, { ok: true });
+    }
     if (p === '/api/chat' && req.method === 'GET') {
       const me = url.searchParams.get('user'), other = url.searchParams.get('with');
       // Maine use block kiya hai to mujhe uski chat khali dikhegi.
@@ -958,7 +977,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 13, min: 12,
+      return send(res, 200, { ok: true, latest: 14, min: 13,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
         notes: 'Naya server — online dot, story like, popular reels sab chalu. Update karke hi app chalega.' });
     }
@@ -1028,6 +1047,19 @@ async function handleRequest(req, res) {
         await saveDb();
         return send(res, 200, { ok: true });
       }
+      if (p === '/api/admin/reports' && req.method === 'GET') {
+        const reps = (db.reports || []).slice().reverse().map(r => {
+          const post = db.posts.find(x => String(x.id) === String(r.postId));
+          return { id: r.id, postId: r.postId, postUser: r.postUser, by: r.by, reason: r.reason, at: r.at,
+            postImage: post ? (post.image || '') : '', postCaption: post ? (post.caption || '') : '', postGone: !post };
+        });
+        return send(res, 200, { ok: true, reports: reps });
+      }
+      if (p === '/api/admin/dismiss-report' && req.method === 'POST') {
+        db.reports = (db.reports || []).filter(r => r.id !== Number(body.reportId));
+        await saveDb();
+        return send(res, 200, { ok: true });
+      }
       if (p === '/api/admin/verify' && req.method === 'POST') {
         const u = byName(body.username);
         if (!u) return send(res, 404, { error: 'user nahi mila' });
@@ -1048,6 +1080,8 @@ async function handleRequest(req, res) {
 }
 
 const server = http.createServer(handleRequest);
+
+ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
 
 ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
 
