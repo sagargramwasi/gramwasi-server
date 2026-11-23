@@ -1157,9 +1157,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 16, min: 16,
+      return send(res, 200, { ok: true, latest: 17, min: 17,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v16 — Reel upload asal, story me video+song, chat me Tic-Tac-Toe game, online Active status. Update karke hi app chalega.' });
+        notes: 'v17 — Screen fix: sab kuch pehle ki tarah sahi jagah par. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
