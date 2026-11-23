@@ -1,0 +1,678 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>Billi Panja & Animated Tic-Tac-Toe</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.49/Tone.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <script>
+    tailwind.config = { theme: { extend: { fontFamily: { sans: ['Inter', 'system-ui', 'sans-serif'] }, colors: { chatbg: '#0d141c', chatbar: '#1b2430', chatin: '#263241', sendblue: '#2b95f6' } } } }
+  </script>
+  <style>
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; user-select: none; }
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #070b10; color: #f1f5f9; font-family: 'Inter', sans-serif; overflow: hidden; touch-action: manipulation; }
+    @keyframes clawShake { 0% { transform: translate(0, 0) rotate(0deg); } 15% { transform: translate(-8px, -6px) rotate(-0.8deg); } 30% { transform: translate(8px, 5px) rotate(0.8deg); } 45% { transform: translate(-6px, 7px) rotate(-0.5deg); } 60% { transform: translate(6px, -4px) rotate(0.5deg); } 75% { transform: translate(-3px, 3px) rotate(-0.2deg); } 90% { transform: translate(3px, -2px) rotate(0.2deg); } 100% { transform: translate(0, 0) rotate(0deg); } }
+    .shake-active { animation: clawShake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97) both; }
+    .chat-doodle-bg { background-color: #0e151e; background-image: radial-gradient(circle at 20% 20%, rgba(43, 149, 246, 0.05) 0%, transparent 45%), radial-gradient(circle at 80% 75%, rgba(239, 68, 68, 0.04) 0%, transparent 50%); }
+    .chat-scroll::-webkit-scrollbar { width: 4px; }
+    .chat-scroll::-webkit-scrollbar-thumb { background: rgba(148, 163, 184, 0.2); border-radius: 9999px; }
+    .draw-line { stroke-dasharray: 400; stroke-dashoffset: 400; animation: drawStroke 0.45s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .draw-line-delay-1 { stroke-dasharray: 400; stroke-dashoffset: 400; animation: drawStroke 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.1s forwards; }
+    .draw-line-delay-2 { stroke-dasharray: 400; stroke-dashoffset: 400; animation: drawStroke 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.2s forwards; }
+    .draw-line-delay-3 { stroke-dasharray: 400; stroke-dashoffset: 400; animation: drawStroke 0.45s cubic-bezier(0.22, 1, 0.36, 1) 0.3s forwards; }
+    @keyframes drawStroke { to { stroke-dashoffset: 0; } }
+    .draw-o { stroke-dasharray: 220; stroke-dashoffset: 220; animation: drawOAnim 0.42s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    @keyframes drawOAnim { to { stroke-dashoffset: 0; } }
+    .draw-x-1 { stroke-dasharray: 120; stroke-dashoffset: 120; animation: drawXAnim 0.24s cubic-bezier(0.22, 1, 0.36, 1) forwards; }
+    .draw-x-2 { stroke-dasharray: 120; stroke-dashoffset: 120; animation: drawXAnim 0.24s cubic-bezier(0.22, 1, 0.36, 1) 0.14s forwards; }
+    @keyframes drawXAnim { to { stroke-dashoffset: 0; } }
+    @keyframes tapPulse { 0% { transform: translate(-50%, -50%) scale(0.35); opacity: 0.95; } 100% { transform: translate(-50%, -50%) scale(1.8); opacity: 0; } }
+    .tap-ripple { position: absolute; width: 56px; height: 56px; border-radius: 9999px; pointer-events: none; animation: tapPulse 0.45s ease-out forwards; }
+    @keyframes crownGlowFloat { 0%, 100% { transform: translateY(0px) scale(1); filter: drop-shadow(0 0 6px rgba(250, 204, 21, 0.9)) drop-shadow(0 0 14px rgba(245, 158, 11, 0.7)); } 50% { transform: translateY(-2.5px) scale(1.08); filter: drop-shadow(0 0 12px rgba(253, 224, 71, 1)) drop-shadow(0 0 22px rgba(251, 191, 36, 0.9)); } }
+    .winner-crown-glow { animation: crownGlowFloat 1.8s ease-in-out infinite; }
+  </style>
+</head>
+<body class="flex items-center justify-center w-full h-full bg-[#070b10]">
+  <div id="appShell" class="relative flex flex-col w-full h-full max-w-md sm:h-[94vh] sm:max-h-[860px] sm:rounded-[2.25rem] sm:border sm:border-slate-800/90 sm:shadow-2xl overflow-hidden chat-doodle-bg">
+    <header class="relative z-30 flex items-center justify-between px-3 py-2.5 bg-[#161f2c]/95 backdrop-blur-md border-b border-slate-800/80 shrink-0">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <button id="resetAllBtn" title="Clear Scratches & Board" class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 text-slate-200 transition">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 19l-7-7 7-7" /></svg>
+        </button>
+        <div class="flex items-center gap-2.5 min-w-0">
+          <div class="relative w-10 h-10 rounded-full overflow-hidden ring-1 ring-white/15 shrink-0 bg-slate-700">
+            <img src="https://placehold.co/100x100/1e293b/e2e8f0?text=DM" alt="demo avatar" class="w-full h-full object-cover" />
+            <span id="clawBadge" class="hidden absolute bottom-0 right-0 w-3 h-3 rounded-full bg-rose-500 ring-2 ring-[#161f2c]"></span>
+          </div>
+          <div class="min-w-0">
+            <div class="flex items-center gap-1.5">
+              <div class="relative inline-flex items-center gap-1 min-w-0">
+                <span id="p1CrownBadge" class="hidden inline-flex items-center gap-0.5 text-amber-300 winner-crown-glow shrink-0" title="Series Winner Crown (10m)">
+                  <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v2H3v-2zm16.5-11l-4.5 4.5L12 5 9 11.5 4.5 7 6 16h12l1.5-9z"/></svg>
+                </span>
+                <h1 id="p1NameHeader" class="text-sm font-semibold text-white truncate">You (X)</h1>
+              </div>
+              <span class="text-slate-500 text-xs">vs</span>
+              <div class="relative inline-flex items-center gap-1 min-w-0">
+                <span id="p2CrownBadge" class="hidden inline-flex items-center gap-0.5 text-amber-300 winner-crown-glow shrink-0" title="Series Winner Crown (10m)">
+                  <svg class="w-4 h-4 text-amber-400" viewBox="0 0 24 24" fill="currentColor"><path d="M3 18h18v2H3v-2zm16.5-11l-4.5 4.5L12 5 9 11.5 4.5 7 6 16h12l1.5-9z"/></svg>
+                </span>
+                <span id="p2NameHeader" class="text-sm font-semibold text-sky-300 truncate">demo (O)</span>
+              </div>
+            </div>
+            <p id="statusSubtext" class="text-xs text-slate-400 truncate">Round 1/3 • Winner strikes loser!</p>
+          </div>
+        </div>
+      </div>
+      <div class="flex items-center gap-1.5 shrink-0">
+        <button id="soundToggleBtn" title="Toggle Sound" class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 text-slate-200 transition">
+          <svg id="soundOnIcon" class="w-5 h-5 text-sky-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /></svg>
+          <svg id="soundOffIcon" class="hidden w-5 h-5 text-slate-500" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z" /><path stroke-linecap="round" stroke-linejoin="round" d="M17 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2" /></svg>
+        </button>
+        <button id="menuModeBtn" title="Switch Mode & Options" class="flex items-center justify-center w-10 h-10 rounded-full bg-slate-800/80 hover:bg-slate-700/80 active:scale-95 text-slate-200 transition">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="2" /><circle cx="12" cy="12" r="2" /><circle cx="12" cy="19" r="2" /></svg>
+        </button>
+      </div>
+    </header>
+    <div class="relative z-30 flex items-center justify-between gap-1.5 px-2.5 py-1.5 bg-[#111923]/90 border-b border-slate-800/60 shrink-0 overflow-x-auto">
+      <div class="flex items-center gap-1.5">
+        <button id="styleCrimsonBtn" class="px-2.5 py-1.5 text-xs font-medium rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 active:scale-95 transition whitespace-nowrap">🩸 Crimson Claw</button>
+        <button id="styleNeonBtn" class="px-2.5 py-1.5 text-xs font-medium rounded-xl bg-slate-800/90 text-slate-300 border border-slate-700/70 hover:bg-slate-700/80 active:scale-95 transition whitespace-nowrap">⚡ Neon Claw</button>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button id="toggleTttBtn" class="px-2.5 py-1.5 text-xs font-semibold rounded-xl bg-sky-500/20 text-sky-300 border border-sky-400/40 hover:bg-sky-500/30 active:scale-95 transition whitespace-nowrap"># 3-Round Match</button>
+        <button id="clearMarksBtn" class="px-2.5 py-1.5 text-xs font-medium rounded-xl bg-slate-800/90 text-slate-300 border border-slate-700/70 hover:bg-slate-700/80 active:scale-95 transition whitespace-nowrap">Clear</button>
+      </div>
+    </div>
+    <div id="matchScoreStrip" class="relative z-30 flex items-center justify-between gap-2 px-3 py-1.5 bg-[#0f1722]/95 border-b border-slate-800/80 text-xs shrink-0">
+      <div class="flex items-center gap-1.5 min-w-0">
+        <span id="p1CardCrown" class="hidden text-sm winner-crown-glow">👑</span>
+        <span id="p1Label" class="font-semibold text-rose-300 truncate">You (X)</span>
+        <span id="p1ScoreBadge" class="px-1.5 py-0.5 rounded-md bg-rose-500/20 text-rose-200 font-bold">0</span>
+      </div>
+      <div class="flex flex-col items-center shrink-0">
+        <span id="roundIndicator" class="px-2.5 py-0.5 rounded-full bg-amber-500/15 text-amber-300 font-semibold border border-amber-400/25">Round 1 / 3</span>
+        <span id="crownCountdownText" class="hidden text-[10px] text-amber-300/90 font-medium mt-0.5">👑 Taj active: 10:00</span>
+      </div>
+      <div class="flex items-center gap-1.5 min-w-0">
+        <span id="p2ScoreBadge" class="px-1.5 py-0.5 rounded-md bg-sky-500/20 text-sky-200 font-bold">0</span>
+        <span id="p2Label" class="font-semibold text-sky-300 truncate">demo (O)</span>
+        <span id="p2CardCrown" class="hidden text-sm winner-crown-glow">👑</span>
+      </div>
+    </div>
+    <main id="screenStage" class="relative flex-1 w-full overflow-hidden select-none">
+      <svg id="bgDoodles" class="absolute inset-0 w-full h-full opacity-[0.06] pointer-events-none" xmlns="http://www.w3.org/2000/svg">
+        <defs>
+          <pattern id="chatPattern" width="160" height="190" patternUnits="userSpaceOnUse">
+            <path d="M28 18l4.2 8.5 9.4 1.4-6.8 6.6 1.6 9.3L28 39.2l-8.4 4.6 1.6-9.3-6.8-6.6 9.4-1.4z" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <path d="M84 52v14M77 59h14" stroke="#94a3b8" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M128 24c-3.5-4.5-10.5-4.5-14 0-3.5 4.5 0 10.5 7 15.5 7-5 10.5-11 7-15.5z" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <circle cx="46" cy="96" r="10" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <circle cx="46" cy="96" r="4.5" fill="none" stroke="#94a3b8" stroke-width="1.4"/>
+            <path d="M114 114v-18l14-3v18" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <circle cx="109" cy="115" r="5" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <circle cx="123" cy="112" r="5" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+            <path d="M26 146l8 8m0-8l-8 8" stroke="#94a3b8" stroke-width="1.6" stroke-linecap="round"/>
+            <path d="M88 136c6 0 10 5 10 11 0 7-10 14-10 14s-10-7-10-14c0-6 4-11 10-11z" fill="none" stroke="#94a3b8" stroke-width="1.6"/>
+          </pattern>
+        </defs>
+        <rect width="100%" height="100%" fill="url(#chatPattern)" />
+      </svg>
+      <div id="chatLog" class="relative z-10 flex flex-col justify-end h-full px-4 py-3 space-y-2.5 pointer-events-none overflow-y-auto chat-scroll">
+        <div class="self-center px-3 py-1 rounded-full bg-slate-800/70 text-[11px] text-slate-400 border border-slate-700/50 text-center">
+          3-Round Battle: Round winner deals <span class="text-rose-400 font-semibold">Billi Panja</span> to loser • Final winner gets <span class="text-amber-300 font-semibold">👑 Taj (10m)</span>
+        </div>
+      </div>
+      <div id="tttBoardContainer" class="absolute inset-0 z-20 flex flex-col items-center justify-center px-5 pointer-events-none">
+        <div class="relative w-full max-w-[320px] aspect-square rounded-3xl bg-[#111a26]/88 backdrop-blur-md border border-slate-700/70 shadow-2xl p-4 pointer-events-auto">
+          <div class="flex items-center justify-between mb-2 px-1">
+            <span id="tttTurnBadge" class="text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30">R1 • Turn: You (X)</span>
+            <div class="flex items-center gap-1.5">
+              <button id="tttAutoDemoBtn" class="px-2 py-1 text-[11px] font-medium rounded-lg bg-amber-500/20 text-amber-300 border border-amber-400/30 hover:bg-amber-500/30 active:scale-95 transition">Auto Round</button>
+              <button id="tttResetBtn" class="px-2 py-1 text-[11px] font-medium rounded-lg bg-slate-800 text-slate-300 border border-slate-700 hover:bg-slate-700 active:scale-95 transition">New Match</button>
+            </div>
+          </div>
+          <div class="relative w-full h-[calc(100%-36px)]">
+            <svg id="tttGridSvg" viewBox="0 0 300 300" class="w-full h-full">
+              <line x1="100" y1="12" x2="100" y2="288" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" class="draw-line" />
+              <line x1="200" y1="12" x2="200" y2="288" stroke="#38bdf8" stroke-width="5" stroke-linecap="round" class="draw-line-delay-1" />
+              <line x1="12" y1="100" x2="288" y2="100" stroke="#f43f5e" stroke-width="5" stroke-linecap="round" class="draw-line-delay-2" />
+              <line x1="12" y1="200" x2="288" y2="200" stroke="#f43f5e" stroke-width="5" stroke-linecap="round" class="draw-line-delay-3" />
+              <g id="tttMarksGroup"></g>
+              <g id="tttWinGroup"></g>
+            </svg>
+            <div id="tttCellsGrid" class="absolute inset-0 grid grid-cols-3 grid-rows-3"></div>
+          </div>
+        </div>
+      </div>
+      <canvas id="clawCanvas" class="absolute inset-0 z-25 w-full h-full pointer-events-none"></canvas>
+      <div id="toastBanner" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-40 px-4 py-2 rounded-full bg-slate-900/95 text-xs font-medium text-white border border-slate-700/80 shadow-xl pointer-events-none transition-all">🐾 Billi Panja!</div>
+    </main>
+    <div id="modeDrawer" class="hidden absolute inset-x-3 bottom-20 z-40 rounded-2xl bg-[#17212f]/98 backdrop-blur-lg border border-slate-700/80 p-3.5 shadow-2xl space-y-3">
+      <div class="flex items-center justify-between">
+        <span class="text-xs font-semibold uppercase tracking-wider text-slate-400">Screen Controls</span>
+        <button id="closeDrawerBtn" class="text-xs text-sky-400 hover:underline">Done</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2">
+        <button id="triggerClawCenterBtn" class="p-2.5 rounded-xl bg-rose-500/15 hover:bg-rose-500/25 border border-rose-500/30 text-left transition active:scale-95">
+          <div class="text-xs font-semibold text-rose-300">🐾 Claw Strike</div>
+          <div class="text-[11px] text-slate-400">Trigger panja now</div>
+        </button>
+        <button id="triggerBothDemoBtn" class="p-2.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 border border-amber-500/30 text-left transition active:scale-95">
+          <div class="text-xs font-semibold text-amber-300">✨ Full Combo</div>
+          <div class="text-[11px] text-slate-400">Grid + O/X + Claw</div>
+        </button>
+      </div>
+    </div>
+    <footer class="relative z-30 flex items-center gap-2 px-3 py-2.5 bg-[#161f2c]/95 backdrop-blur-md border-t border-slate-800/80 shrink-0">
+      <div class="flex items-center flex-1 gap-2 px-3 py-2 rounded-full bg-[#243040] border border-slate-700/50 focus-within:border-sky-500/60 transition">
+        <button id="emojiQuickBtn" type="button" title="Send Cat Emoji" class="text-xl leading-none active:scale-90 transition shrink-0">😊</button>
+        <input id="chatInput" type="text" placeholder="Message" autocomplete="off" class="w-full bg-transparent text-sm text-white placeholder-slate-400 focus:outline-none" />
+      </div>
+      <button id="sendBtn" type="button" title="Send" class="flex items-center justify-center w-11 h-11 rounded-full bg-[#2b95f6] hover:bg-[#389ff8] active:scale-95 text-white shadow-lg shadow-sky-500/20 transition shrink-0">
+        <svg class="w-5 h-5 translate-x-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" /></svg>
+      </button>
+    </footer>
+  </div>
+
+  <script>
+    (function () {
+      const appShell = document.getElementById('appShell');
+      const screenStage = document.getElementById('screenStage');
+      const clawCanvas = document.getElementById('clawCanvas');
+      const ctx = clawCanvas.getContext('2d');
+      const chatLog = document.getElementById('chatLog');
+      const chatInput = document.getElementById('chatInput');
+      const sendBtn = document.getElementById('sendBtn');
+      const emojiQuickBtn = document.getElementById('emojiQuickBtn');
+      const styleCrimsonBtn = document.getElementById('styleCrimsonBtn');
+      const styleNeonBtn = document.getElementById('styleNeonBtn');
+      const toggleTttBtn = document.getElementById('toggleTttBtn');
+      const clearMarksBtn = document.getElementById('clearMarksBtn');
+      const resetAllBtn = document.getElementById('resetAllBtn');
+      const soundToggleBtn = document.getElementById('soundToggleBtn');
+      const soundOnIcon = document.getElementById('soundOnIcon');
+      const soundOffIcon = document.getElementById('soundOffIcon');
+      const menuModeBtn = document.getElementById('menuModeBtn');
+      const modeDrawer = document.getElementById('modeDrawer');
+      const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+      const triggerClawCenterBtn = document.getElementById('triggerClawCenterBtn');
+      const triggerBothDemoBtn = document.getElementById('triggerBothDemoBtn');
+      const tttBoardContainer = document.getElementById('tttBoardContainer');
+      const tttGridSvg = document.getElementById('tttGridSvg');
+      const tttMarksGroup = document.getElementById('tttMarksGroup');
+      const tttWinGroup = document.getElementById('tttWinGroup');
+      const tttCellsGrid = document.getElementById('tttCellsGrid');
+      const tttTurnBadge = document.getElementById('tttTurnBadge');
+      const tttAutoDemoBtn = document.getElementById('tttAutoDemoBtn');
+      const tttResetBtn = document.getElementById('tttResetBtn');
+      const toastBanner = document.getElementById('toastBanner');
+      const clawBadge = document.getElementById('clawBadge');
+      const statusSubtext = document.getElementById('statusSubtext');
+      const p1CrownBadge = document.getElementById('p1CrownBadge');
+      const p2CrownBadge = document.getElementById('p2CrownBadge');
+      const p1CardCrown = document.getElementById('p1CardCrown');
+      const p2CardCrown = document.getElementById('p2CardCrown');
+      const p1NameHeader = document.getElementById('p1NameHeader');
+      const p2NameHeader = document.getElementById('p2NameHeader');
+      const p1Label = document.getElementById('p1Label');
+      const p2Label = document.getElementById('p2Label');
+      const p1ScoreBadge = document.getElementById('p1ScoreBadge');
+      const p2ScoreBadge = document.getElementById('p2ScoreBadge');
+      const roundIndicator = document.getElementById('roundIndicator');
+      const crownCountdownText = document.getElementById('crownCountdownText');
+
+      let clawStyle = 'crimson';
+      let soundEnabled = true;
+      let tttVisible = true;
+      let tttBoard = Array(9).fill(null);
+      let currentTurn = 'X';
+      let tttGameOver = false;
+      let autoDemoTimer = null;
+      const TOTAL_ROUNDS = 3;
+      const CROWN_DURATION_MS = 10 * 60 * 1000;
+      let player1Name = 'You';
+      let player2Name = 'demo';
+      let currentRound = 1;
+      let p1Wins = 0;
+      let p2Wins = 0;
+      let seriesFinished = false;
+      let crownExpireTimestamp = null;
+      let crownTimerInterval = null;
+      let nextRoundTimeout = null;
+      let slashes = [];
+      let particles = [];
+      let lastTapTime = 0;
+      let lastTapX = 0;
+      let lastTapY = 0;
+      let audioReady = false;
+      let clawNoiseSynth = null;
+      let markSynth = null;
+
+      async function initAudio() {
+        if (!soundEnabled) return;
+        try {
+          if (typeof Tone !== 'undefined') {
+            if (!audioReady) {
+              await Tone.start();
+              clawNoiseSynth = new Tone.NoiseSynth({ noise: { type: 'pink' }, envelope: { attack: 0.005, decay: 0.22, sustain: 0 } }).toDestination();
+              clawNoiseSynth.volume.value = -8;
+              markSynth = new Tone.PolySynth(Tone.Synth, { oscillator: { type: 'triangle' }, envelope: { attack: 0.01, decay: 0.14, sustain: 0, release: 0.1 } }).toDestination();
+              markSynth.volume.value = -12;
+              audioReady = true;
+            }
+          }
+        } catch (err) {}
+      }
+      function playClawSound() { if (!soundEnabled) return; initAudio().then(() => { try { if (clawNoiseSynth) clawNoiseSynth.triggerAttackRelease('0.22'); } catch (_) {} }); }
+      function playMarkSound(mark) { if (!soundEnabled) return; initAudio().then(() => { try { if (markSynth) markSynth.triggerAttackRelease(mark === 'X' ? 'C5' : 'G4', '0.12'); } catch (_) {} }); }
+
+      let toastTimeout = null;
+      function showToast(message) { toastBanner.textContent = message; toastBanner.classList.remove('hidden'); clearTimeout(toastTimeout); toastTimeout = setTimeout(() => { toastBanner.classList.add('hidden'); }, 1600); }
+
+      function resizeCanvas() {
+        const rect = screenStage.getBoundingClientRect();
+        const dpr = Math.min(window.devicePixelRatio || 1, 2);
+        clawCanvas.width = Math.max(1, Math.floor(rect.width * dpr));
+        clawCanvas.height = Math.max(1, Math.floor(rect.height * dpr));
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      }
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+
+      function spawnTapRipple(x, y, isDouble) {
+        const ripple = document.createElement('div');
+        ripple.className = 'tap-ripple';
+        ripple.style.left = `${x}px`;
+        ripple.style.top = `${y}px`;
+        ripple.style.border = isDouble ? '2px solid rgba(244, 63, 94, 0.85)' : '1.5px solid rgba(56, 189, 248, 0.6)';
+        screenStage.appendChild(ripple);
+        setTimeout(() => ripple.remove(), 480);
+      }
+
+      function triggerBilliPanja(x, y) {
+        const rect = screenStage.getBoundingClientRect();
+        const centerX = x ?? rect.width * 0.5;
+        const centerY = y ?? rect.height * 0.45;
+        appShell.classList.remove('shake-active');
+        void appShell.offsetWidth;
+        appShell.classList.add('shake-active');
+        clawBadge.classList.remove('hidden');
+        playClawSound();
+        const baseAngle = (-34 + (Math.random() * 24 - 12)) * (Math.PI / 180);
+        const clawCount = 4;
+        const spacing = 22;
+        const slashLength = Math.min(rect.width, rect.height) * 0.44;
+        for (let i = 0; i < clawCount; i++) {
+          const offsetIndex = i - (clawCount - 1) / 2;
+          const perpX = -Math.sin(baseAngle) * offsetIndex * spacing;
+          const perpY = Math.cos(baseAngle) * offsetIndex * spacing;
+          const startX = centerX + perpX - Math.cos(baseAngle) * (slashLength * 0.55);
+          const startY = centerY + perpY - Math.sin(baseAngle) * (slashLength * 0.55);
+          const endX = centerX + perpX + Math.cos(baseAngle) * (slashLength * 0.55);
+          const endY = centerY + perpY + Math.sin(baseAngle) * (slashLength * 0.55);
+          const midX = (startX + endX) / 2 + perpX * 0.14;
+          const midY = (startY + endY) / 2 + perpY * 0.14;
+          slashes.push({ startX, startY, midX, midY, endX, endY, progress: 0, speed: 0.13 + i * 0.015, alpha: 1, fadeDelay: 18 + i * 3, width: i === 1 || i === 2 ? 6.5 : 5, style: clawStyle });
+          for (let p = 0; p < 10; p++) {
+            const t = Math.random();
+            const px = (1 - t) * (1 - t) * startX + 2 * (1 - t) * t * midX + t * t * endX;
+            const py = (1 - t) * (1 - t) * startY + 2 * (1 - t) * t * midY + t * t * endY;
+            const spreadAngle = Math.random() * Math.PI * 2;
+            const speed = 1.2 + Math.random() * 4.2;
+            particles.push({ x: px, y: py, vx: Math.cos(spreadAngle) * speed, vy: Math.sin(spreadAngle) * speed - 0.8, size: 1.5 + Math.random() * 3, life: 1, decay: 0.025 + Math.random() * 0.025, style: clawStyle });
+          }
+        }
+        appendSystemBubble(clawStyle === 'crimson' ? '🐾 Billi Panja! 4 sharp crimson claw marks on screen!' : '⚡ Neon Billi Panja! Electric claw slash across screen!');
+        showToast('🐾 Billi Panja!');
+      }
+
+      function renderClaws() {
+        const rect = screenStage.getBoundingClientRect();
+        ctx.clearRect(0, 0, rect.width, rect.height);
+        for (let i = slashes.length - 1; i >= 0; i--) {
+          const s = slashes[i];
+          s.progress = Math.min(1, s.progress + s.speed);
+          if (s.progress >= 1) { if (s.fadeDelay > 0) { s.fadeDelay--; } else { s.alpha -= 0.032; } }
+          if (s.alpha <= 0) { slashes.splice(i, 1); continue; }
+          const t = s.progress;
+          const curX = (1 - t) * (1 - t) * s.startX + 2 * (1 - t) * t * s.midX + t * t * s.endX;
+          const curY = (1 - t) * (1 - t) * s.startY + 2 * (1 - t) * t * s.midY + t * t * s.endY;
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, s.alpha);
+          ctx.lineCap = 'round';
+          ctx.lineJoin = 'round';
+          const isCrimson = s.style === 'crimson';
+          const outerGlow = isCrimson ? 'rgba(225, 29, 72, 0.65)' : 'rgba(34, 211, 238, 0.75)';
+          const mainColor = isCrimson ? '#e11d48' : '#06b6d4';
+          const innerCore = isCrimson ? '#fecdd3' : '#ecfeff';
+          ctx.shadowColor = outerGlow;
+          ctx.shadowBlur = 16;
+          ctx.strokeStyle = mainColor;
+          ctx.lineWidth = s.width * 1.45;
+          ctx.beginPath();
+          ctx.moveTo(s.startX, s.startY);
+          const ctrlX = (s.startX + curX) / 2 + (s.midX - (s.startX + s.endX) / 2) * t;
+          const ctrlY = (s.startY + curY) / 2 + (s.midY - (s.startY + s.endY) / 2) * t;
+          ctx.quadraticCurveTo(ctrlX, ctrlY, curX, curY);
+          ctx.stroke();
+          ctx.shadowBlur = 4;
+          ctx.strokeStyle = innerCore;
+          ctx.lineWidth = Math.max(1.5, s.width * 0.42);
+          ctx.stroke();
+          ctx.restore();
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+          const p = particles[i];
+          p.x += p.vx; p.y += p.vy; p.vy += 0.08; p.life -= p.decay;
+          if (p.life <= 0) { particles.splice(i, 1); continue; }
+          ctx.save();
+          ctx.globalAlpha = Math.max(0, p.life);
+          ctx.fillStyle = p.style === 'crimson' ? '#fb7185' : '#67e8f9';
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
+        }
+        requestAnimationFrame(renderClaws);
+      }
+      window.onload = function () { resizeCanvas(); renderClaws(); };
+
+      screenStage.addEventListener('pointerdown', (e) => {
+        if (e.target.closest('button') || e.target.closest('.ttt-cell')) return;
+        const rect = screenStage.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        const y = e.clientY - rect.top;
+        const now = Date.now();
+        const dt = now - lastTapTime;
+        const dist = Math.hypot(x - lastTapX, y - lastTapY);
+        if (dt > 0 && dt < 360 && dist < 70) {
+          spawnTapRipple(x, y, true);
+          triggerBilliPanja(x, y);
+          lastTapTime = 0;
+        } else {
+          spawnTapRipple(x, y, false);
+          lastTapTime = now; lastTapX = x; lastTapY = y;
+        }
+      });
+
+      styleCrimsonBtn.addEventListener('click', () => {
+        clawStyle = 'crimson';
+        styleCrimsonBtn.className = 'px-2.5 py-1.5 text-xs font-medium rounded-xl bg-rose-500/20 text-rose-300 border border-rose-500/40 hover:bg-rose-500/30 active:scale-95 transition whitespace-nowrap';
+        styleNeonBtn.className = 'px-2.5 py-1.5 text-xs font-medium rounded-xl bg-slate-800/90 text-slate-300 border border-slate-700/70 hover:bg-slate-700/80 active:scale-95 transition whitespace-nowrap';
+        showToast('🩸 Crimson Claw selected');
+      });
+      styleNeonBtn.addEventListener('click', () => {
+        clawStyle = 'neon';
+        styleNeonBtn.className = 'px-2.5 py-1.5 text-xs font-medium rounded-xl bg-cyan-500/20 text-cyan-300 border border-cyan-400/40 hover:bg-cyan-500/30 active:scale-95 transition whitespace-nowrap';
+        styleCrimsonBtn.className = 'px-2.5 py-1.5 text-xs font-medium rounded-xl bg-slate-800/90 text-slate-300 border border-slate-700/70 hover:bg-slate-700/80 active:scale-95 transition whitespace-nowrap';
+        showToast('⚡ Neon Claw selected');
+      });
+      soundToggleBtn.addEventListener('click', () => {
+        soundEnabled = !soundEnabled;
+        soundOnIcon.classList.toggle('hidden', !soundEnabled);
+        soundOffIcon.classList.toggle('hidden', soundEnabled);
+        showToast(soundEnabled ? '🔊 Sound On' : '🔇 Sound Muted');
+      });
+      menuModeBtn.addEventListener('click', () => { modeDrawer.classList.toggle('hidden'); });
+      closeDrawerBtn.addEventListener('click', () => { modeDrawer.classList.add('hidden'); });
+      triggerClawCenterBtn.addEventListener('click', () => {
+        modeDrawer.classList.add('hidden');
+        const rect = screenStage.getBoundingClientRect();
+        triggerBilliPanja(rect.width * 0.5, rect.height * 0.45);
+      });
+      triggerBothDemoBtn.addEventListener('click', () => {
+        modeDrawer.classList.add('hidden');
+        setTttVisibility(true);
+        resetTttBoard(false);
+        runAutoTttDemo();
+        const rect = screenStage.getBoundingClientRect();
+        setTimeout(() => triggerBilliPanja(rect.width * 0.52, rect.height * 0.42), 550);
+      });
+
+      function appendUserBubble(text) {
+        const bubble = document.createElement('div');
+        bubble.className = 'self-end max-w-[80%] px-3.5 py-2 rounded-2xl rounded-br-sm bg-[#2b95f6] text-white text-sm shadow';
+        bubble.textContent = text;
+        chatLog.appendChild(bubble);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      function appendSystemBubble(text) {
+        const bubble = document.createElement('div');
+        bubble.className = 'self-start max-w-[84%] px-3 py-1.5 rounded-2xl rounded-bl-sm bg-[#1c2634]/90 text-slate-200 text-xs border border-slate-700/60 shadow';
+        bubble.textContent = text;
+        chatLog.appendChild(bubble);
+        chatLog.scrollTop = chatLog.scrollHeight;
+      }
+      function handleSendMessage() {
+        const val = chatInput.value.trim();
+        if (!val) return;
+        appendUserBubble(val);
+        chatInput.value = '';
+        const lower = val.toLowerCase();
+        if (lower.includes('claw') || lower.includes('panja') || lower.includes('cat') || lower.includes('billi')) {
+          const rect = screenStage.getBoundingClientRect();
+          triggerBilliPanja(rect.width * 0.5, rect.height * 0.45);
+        } else if (lower.includes('tic') || lower.includes('ttt') || lower.includes('game')) {
+          setTttVisibility(true);
+          runAutoTttDemo();
+        }
+      }
+      sendBtn.addEventListener('click', handleSendMessage);
+      chatInput.addEventListener('keydown', (e) => { if (e.key === 'Enter') handleSendMessage(); });
+      emojiQuickBtn.addEventListener('click', () => {
+        appendUserBubble('😼 2-tap panja!');
+        const rect = screenStage.getBoundingClientRect();
+        triggerBilliPanja(rect.width * 0.5, rect.height * 0.45);
+      });
+      clearMarksBtn.addEventListener('click', () => { slashes = []; particles = []; clawBadge.classList.add('hidden'); showToast('✨ Screen cleared'); });
+      resetAllBtn.addEventListener('click', () => { slashes = []; particles = []; clawBadge.classList.add('hidden'); startNew3RoundMatch(); showToast('🔄 New 3-Round Match Started'); });
+
+      function updateMatchScoreUI() {
+        p1NameHeader.textContent = `${player1Name} (X)`;
+        p2NameHeader.textContent = `${player2Name} (O)`;
+        p1Label.textContent = `${player1Name} (X)`;
+        p2Label.textContent = `${player2Name} (O)`;
+        p1ScoreBadge.textContent = p1Wins;
+        p2ScoreBadge.textContent = p2Wins;
+        roundIndicator.textContent = seriesFinished ? 'Match Complete' : `Round ${currentRound} / ${TOTAL_ROUNDS}`;
+      }
+      function clearWinnerCrown() {
+        if (crownTimerInterval) { clearInterval(crownTimerInterval); crownTimerInterval = null; }
+        crownExpireTimestamp = null;
+        p1CrownBadge.classList.add('hidden');
+        p2CrownBadge.classList.add('hidden');
+        p1CardCrown.classList.add('hidden');
+        p2CardCrown.classList.add('hidden');
+        crownCountdownText.classList.add('hidden');
+      }
+      function awardGlowingCrownToWinner(winnerSide) {
+        clearWinnerCrown();
+        if (winnerSide === 'X') { p1CrownBadge.classList.remove('hidden'); p1CardCrown.classList.remove('hidden'); }
+        else if (winnerSide === 'O') { p2CrownBadge.classList.remove('hidden'); p2CardCrown.classList.remove('hidden'); }
+        else { p1CrownBadge.classList.remove('hidden'); p2CrownBadge.classList.remove('hidden'); p1CardCrown.classList.remove('hidden'); p2CardCrown.classList.remove('hidden'); }
+        crownExpireTimestamp = Date.now() + CROWN_DURATION_MS;
+        crownCountdownText.classList.remove('hidden');
+        function tickCrownCountdown() {
+          const remaining = crownExpireTimestamp - Date.now();
+          if (remaining <= 0) { clearWinnerCrown(); appendSystemBubble('✨ 10 minutes over — winner crown has faded away.'); return; }
+          const mins = Math.floor(remaining / 60000);
+          const secs = Math.floor((remaining % 60000) / 1000);
+          crownCountdownText.textContent = `👑 Taj active: ${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`;
+        }
+        tickCrownCountdown();
+        crownTimerInterval = setInterval(tickCrownCountdown, 1000);
+      }
+      function strikeLoserWithPanja(winnerSide) {
+        const rect = screenStage.getBoundingClientRect();
+        const targetX = winnerSide === 'X' ? rect.width * 0.68 : rect.width * 0.32;
+        const targetY = rect.height * 0.46;
+        triggerBilliPanja(targetX, targetY);
+      }
+      function startNew3RoundMatch() {
+        if (nextRoundTimeout) { clearTimeout(nextRoundTimeout); nextRoundTimeout = null; }
+        currentRound = 1; p1Wins = 0; p2Wins = 0; seriesFinished = false;
+        clearWinnerCrown();
+        updateMatchScoreUI();
+        resetTttBoard(true);
+        statusSubtext.textContent = `Round 1/3 • Winner strikes loser!`;
+      }
+
+      const WIN_COMBOS = [ [0,1,2],[3,4,5],[6,7,8],[0,3,6],[1,4,7],[2,5,8],[0,4,8],[2,4,6] ];
+      const CELL_CENTERS = [ [50,50],[150,50],[250,50],[50,150],[150,150],[250,150],[50,250],[150,250],[250,250] ];
+
+      function setTttVisibility(show) {
+        tttVisible = show;
+        tttBoardContainer.classList.toggle('hidden', !show);
+        if (show) {
+          const lines = tttGridSvg.querySelectorAll('line');
+          lines.forEach((line) => { const cls = line.getAttribute('class'); line.setAttribute('class', ''); void line.offsetWidth; line.setAttribute('class', cls); });
+        }
+      }
+      toggleTttBtn.addEventListener('click', () => { setTttVisibility(!tttVisible); if (tttVisible) showToast('# 3-Round Tic-Tac-Toe Active'); });
+
+      function buildTttCells() {
+        tttCellsGrid.innerHTML = '';
+        for (let i = 0; i < 9; i++) {
+          const cell = document.createElement('button');
+          cell.type = 'button';
+          cell.className = 'ttt-cell w-full h-full focus:outline-none active:bg-white/5 transition';
+          cell.setAttribute('aria-label', `Cell ${i + 1}`);
+          cell.addEventListener('click', () => handleTttCellClick(i));
+          tttCellsGrid.appendChild(cell);
+        }
+      }
+      function renderMarkSvg(index, mark) {
+        const [cx, cy] = CELL_CENTERS[index];
+        if (mark === 'O') {
+          const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+          circle.setAttribute('cx', cx); circle.setAttribute('cy', cy); circle.setAttribute('r', '28');
+          circle.setAttribute('fill', 'none'); circle.setAttribute('stroke', '#38bdf8'); circle.setAttribute('stroke-width', '6'); circle.setAttribute('stroke-linecap', 'round');
+          circle.setAttribute('transform', `rotate(-90 ${cx} ${cy})`);
+          circle.setAttribute('class', 'draw-o');
+          tttMarksGroup.appendChild(circle);
+        } else if (mark === 'X') {
+          const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+          const l1 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          l1.setAttribute('x1', cx - 24); l1.setAttribute('y1', cy - 24); l1.setAttribute('x2', cx + 24); l1.setAttribute('y2', cy + 24);
+          l1.setAttribute('stroke', '#fb7185'); l1.setAttribute('stroke-width', '6'); l1.setAttribute('stroke-linecap', 'round'); l1.setAttribute('class', 'draw-x-1');
+          const l2 = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+          l2.setAttribute('x1', cx + 24); l2.setAttribute('y1', cy - 24); l2.setAttribute('x2', cx - 24); l2.setAttribute('y2', cy + 24);
+          l2.setAttribute('stroke', '#fb7185'); l2.setAttribute('stroke-width', '6'); l2.setAttribute('stroke-linecap', 'round'); l2.setAttribute('class', 'draw-x-2');
+          g.appendChild(l1); g.appendChild(l2);
+          tttMarksGroup.appendChild(g);
+        }
+      }
+      function checkWin() {
+        for (const combo of WIN_COMBOS) {
+          const [a, b, c] = combo;
+          if (tttBoard[a] && tttBoard[a] === tttBoard[b] && tttBoard[a] === tttBoard[c]) return { winner: tttBoard[a], combo };
+        }
+        if (tttBoard.every((cell) => cell !== null)) return { winner: 'Draw', combo: null };
+        return null;
+      }
+      function drawWinStrike(combo) {
+        const [startIdx, , endIdx] = combo;
+        const [x1, y1] = CELL_CENTERS[startIdx];
+        const [x2, y2] = CELL_CENTERS[endIdx];
+        const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+        line.setAttribute('x1', x1); line.setAttribute('y1', y1); line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+        line.setAttribute('stroke', '#facc15'); line.setAttribute('stroke-width', '6.5'); line.setAttribute('stroke-linecap', 'round'); line.setAttribute('class', 'draw-line');
+        tttWinGroup.appendChild(line);
+      }
+      function handleTttCellClick(index) {
+        if (tttGameOver || seriesFinished || tttBoard[index] !== null) return;
+        const mark = currentTurn;
+        tttBoard[index] = mark;
+        renderMarkSvg(index, mark);
+        playMarkSound(mark);
+        const result = checkWin();
+        if (result) {
+          tttGameOver = true;
+          const completedRound = currentRound;
+          if (result.winner === 'Draw') {
+            tttTurnBadge.textContent = `R${completedRound} Draw!`;
+            showToast(`🤝 Round ${completedRound} Draw!`);
+            appendSystemBubble(`🤝 Round ${completedRound} ended in a Draw! Both take a scratch!`);
+            const rect = screenStage.getBoundingClientRect();
+            triggerBilliPanja(rect.width * 0.5, rect.height * 0.46);
+          } else {
+            drawWinStrike(result.combo);
+            const winnerName = result.winner === 'X' ? `${player1Name} (X)` : `${player2Name} (O)`;
+            const loserName = result.winner === 'X' ? `${player2Name} (O)` : `${player1Name} (X)`;
+            if (result.winner === 'X') p1Wins++; else p2Wins++;
+            updateMatchScoreUI();
+            tttTurnBadge.textContent = `R${completedRound}: ${winnerName} Won!`;
+            showToast(`🐾 ${winnerName} struck ${loserName}!`);
+            appendSystemBubble(`🐾 Round ${completedRound}: ${winnerName} jeeta aur ${loserName} ko panja mara!`);
+            strikeLoserWithPanja(result.winner);
+          }
+          if (completedRound < TOTAL_ROUNDS) {
+            nextRoundTimeout = setTimeout(() => {
+              currentRound = completedRound + 1;
+              updateMatchScoreUI();
+              resetTttBoard(true);
+              statusSubtext.textContent = `Round ${currentRound}/3 • Winner strikes loser!`;
+              showToast(`⚔️ Round ${currentRound} of 3!`);
+            }, 1700);
+          } else {
+            seriesFinished = true;
+            updateMatchScoreUI();
+            nextRoundTimeout = setTimeout(() => {
+              let grandWinnerSide = 'Tie';
+              let grandWinnerText = 'Match Tied';
+              if (p1Wins > p2Wins) { grandWinnerSide = 'X'; grandWinnerText = `${player1Name} (X)`; }
+              else if (p2Wins > p1Wins) { grandWinnerSide = 'O'; grandWinnerText = `${player2Name} (O)`; }
+              awardGlowingCrownToWinner(grandWinnerSide);
+              tttTurnBadge.textContent = `👑 ${grandWinnerText} Champion!`;
+              statusSubtext.textContent = `👑 ${grandWinnerText} wears the glowing Taj for 10m!`;
+              showToast(`👑 ${grandWinnerText} won the 3-Round Series!`);
+              appendSystemBubble(`👑 Final Round Complete! ${grandWinnerText} ke naam par chamakta hua Taj ban gaya hai (10 min tak visible rahega)!`);
+            }, 1200);
+          }
+        } else {
+          currentTurn = currentTurn === 'X' ? 'O' : 'X';
+          const nextName = currentTurn === 'X' ? `${player1Name} (X)` : `${player2Name} (O)`;
+          tttTurnBadge.textContent = `R${currentRound} • Turn: ${nextName}`;
+          tttTurnBadge.className = currentTurn === 'X'
+            ? 'text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30'
+            : 'text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30';
+        }
+      }
+      function resetTttBoard(clearDemoTimer = true) {
+        if (clearDemoTimer && autoDemoTimer) { clearInterval(autoDemoTimer); autoDemoTimer = null; }
+        tttBoard = Array(9).fill(null);
+        currentTurn = currentRound % 2 === 1 ? 'X' : 'O';
+        tttGameOver = false;
+        tttMarksGroup.innerHTML = '';
+        tttWinGroup.innerHTML = '';
+        const starterName = currentTurn === 'X' ? `${player1Name} (X)` : `${player2Name} (O)`;
+        tttTurnBadge.textContent = `R${currentRound} • Turn: ${starterName}`;
+        tttTurnBadge.className = currentTurn === 'X'
+          ? 'text-xs font-semibold px-2.5 py-1 rounded-full bg-rose-500/20 text-rose-300 border border-rose-400/30'
+          : 'text-xs font-semibold px-2.5 py-1 rounded-full bg-sky-500/20 text-sky-300 border border-sky-400/30';
+      }
+      function runAutoTttDemo() {
+        if (seriesFinished) { startNew3RoundMatch(); } else { resetTttBoard(true); }
+        const sequencesByRound = { 1: [0, 3, 1, 4, 2], 2: [4, 0, 1, 2, 7, 8], 3: [0, 1, 4, 2, 8] };
+        const demoSequence = sequencesByRound[currentRound] || [0, 4, 1, 8, 2];
+        let step = 0;
+        autoDemoTimer = setInterval(() => {
+          if (step >= demoSequence.length || tttGameOver) { clearInterval(autoDemoTimer); autoDemoTimer = null; return; }
+          handleTttCellClick(demoSequence[step]);
+          step++;
+        }, 340);
+      }
+      tttAutoDemoBtn.addEventListener('click', runAutoTttDemo);
+      tttResetBtn.addEventListener('click', () => { startNew3RoundMatch(); showToast('New 3-Round Match Ready'); });
+
+      buildTttCells();
+      updateMatchScoreUI();
+    })();
+  </script>
+</body>
+</html>
