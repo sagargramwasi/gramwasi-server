@@ -270,7 +270,8 @@ function serializePost(post) {
   migratePost(post);
   const out = { ...post, likes: (post.baseLikes || 0) + post.likedBy.length,
     likedBy: post.likedBy.slice(), user: post.username, author: pub(byName(post.username)) };
-  if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
+  if (post.tgKind === 'video' && post.telegramFileId) out.video = '/api/media?postId=' + post.id;
+  else if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
   return out;
 }
 // Seeded popular reels: Reels tab khali na lage isliye Google ke sample bucket
@@ -558,6 +559,25 @@ function tgUploadPhoto(buffer, caption) {
     r.write(payload); r.end();
   });
 }
+function tgUploadVideo(buffer, caption) {
+  // multipart upload of a video buffer via sendVideo; resolves to Telegram file_id or null
+  return new Promise(resolve => {
+    if (!TG_ON) return resolve(null);
+    const boundary = '----gw' + Date.now();
+    const head = Buffer.from('--' + boundary + '\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n' + TG_CHAT +
+      '\r\n--' + boundary + '\r\nContent-Disposition: form-data; name="caption"\r\n\r\n' + (caption || 'GramWasi video') +
+      '\r\n--' + boundary + '\r\nContent-Disposition: form-data; name="video"; filename="video.mp4"\r\nContent-Type: video/mp4\r\n\r\n');
+    const tail = Buffer.from('\r\n--' + boundary + '--\r\n');
+    const payload = Buffer.concat([head, buffer, tail]);
+    const r = https.request({ host: 'api.telegram.org', path: '/bot' + TG_TOKEN + '/sendVideo',
+      method: 'POST', headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': payload.length } },
+      resp => { let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
+        try { const j = JSON.parse(d); const v = j.result && j.result.video; resolve(v ? v.file_id : null); }
+        catch (e) { resolve(null); } }); });
+    r.on('error', () => resolve(null));
+    r.write(payload); r.end();
+  });
+}
 async function tgStorePostImage(post) {
   if (!TG_ON || !post.image) return;
   try {
@@ -605,7 +625,7 @@ async function handleRequest(req, res) {
   if (p === '/' || p === '/health') { send(res, 200, { app: 'GramWasi', ok: true, telegramStorage: TG_ON, storage: SUPABASE_ON ? 'supabase' : 'file' }); return; }
   if (p === '/api/media' && req.method === 'GET') {
     // Telegram par stored photo ko wapas dikhana: /api/media?postId=<id>
-    const post = db.posts.find(x => x.id === Number(url.searchParams.get('postId')));
+    const post = db.posts.find(x => x.id === Number(url.searchParams.get('postId'))) || (db.stories || []).find(x => x.id === Number(url.searchParams.get('postId')));
     if (!post) { send(res, 404, { error: 'post nahi mila' }); return; }
     if (post.image) { res.writeHead(302, { Location: post.image }); res.end(); return; }
     if (post.telegramFileId && TG_ON) {
@@ -774,12 +794,27 @@ async function handleRequest(req, res) {
       // (data URL, ~1.5MB tak). views me dekhene walon ke username jama hote hain.
       const me = byName(body.username);
       if (!me) return send(res, 404, { error: 'user nahi mila' });
-      if (typeof body.image !== 'string' || !body.image || body.image.length > 1.5 * 1024 * 1024) {
+      const hasVideo = typeof body.video === 'string' && body.video.startsWith('data:video');
+      if (!hasVideo && (typeof body.image !== 'string' || !body.image || body.image.length > 1.5 * 1024 * 1024)) {
         return send(res, 400, { error: 'story image chahiye (max ~1.5MB)' });
       }
       db.stories = db.stories || [];
-      const story = { id: db.seq++, username: me.username, image: body.image,
+      const story = { id: db.seq++, username: me.username, image: hasVideo ? '' : body.image,
         caption: body.caption ? String(body.caption) : '', at: Date.now(), views: [], likes: [] };
+      if (typeof body.song === 'string' && body.song.startsWith('http') && body.song.length < 400) story.song = body.song;
+      if (hasVideo) {
+        // Story video bhi Telegram par — blob me nahi. Fail ho to chhota
+        // (<6MB) blob me, warna reject.
+        const b64 = body.video.split(',')[1] || '';
+        const buf = Buffer.from(b64, 'base64');
+        let fid = null;
+        if (buf.length > 0 && buf.length < 49 * 1024 * 1024) {
+          try { fid = await tgUploadVideo(buf, '@' + me.username + ' ki story'); } catch (e) { fid = null; }
+        }
+        if (fid) { story.telegramFileId = fid; story.tgKind = 'video'; }
+        else if (body.video.length <= 6 * 1024 * 1024) { story.video = body.video; }
+        else return send(res, 400, { error: 'Story video bahut bada hai — chhoti video try karo' });
+      }
       db.stories.push(story);
       await saveDb();
       return send(res, 201, { ok: true, story });
@@ -796,7 +831,7 @@ async function handleRequest(req, res) {
       const byUser = {};
       db.stories.forEach(s => {
         if (!byUser[s.username]) byUser[s.username] = [];
-        byUser[s.username].push({ id: s.id, image: s.image, caption: s.caption || '', at: s.at, views: s.views || [], likes: Array.isArray(s.likes) ? s.likes : [] });
+        byUser[s.username].push({ id: s.id, image: s.image, caption: s.caption || '', at: s.at, views: s.views || [], likes: Array.isArray(s.likes) ? s.likes : [], video: s.telegramFileId ? '/api/media?postId=' + s.id : (s.video || ''), song: s.song || '' });
       });
       const groups = Object.keys(byUser).map(username => {
         const items = byUser[username].slice().sort((a, b) => a.at - b.at);
@@ -939,6 +974,21 @@ async function handleRequest(req, res) {
       const post = { id: db.seq++, username: me.username, image: body.image || '',
         caption: body.caption || '', likedBy: [], baseLikes: 0, comments: [], createdAt: Date.now() };
       if (body.video) post.video = true;
+      // v16: reel ka video data (image field me data:video aata hai) Telegram
+      // par store karo — DB blob me bada video nahi rakhenge. Fail ho to
+      // chhota video (<8MB) hi blob me rakho, bada reject.
+      if (body.video && typeof body.image === 'string' && body.image.startsWith('data:video')) {
+        const b64 = body.image.split(',')[1] || '';
+        const buf = Buffer.from(b64, 'base64');
+        let fid = null;
+        if (buf.length > 0 && buf.length < 49 * 1024 * 1024) {
+          try { fid = await tgUploadVideo(buf, '@' + me.username + ': ' + (body.caption || 'reel')); } catch (e) { fid = null; }
+        }
+        if (fid) { post.telegramFileId = fid; post.tgKind = 'video'; post.image = ''; }
+        else if (body.image.length > 8 * 1024 * 1024) {
+          return send(res, 400, { error: 'Video bahut bada hai — 15MB se chhoti reel try karo' });
+        }
+      }
       db.posts.push(post); await saveDb();
       await tgStorePostImage(post); // response se PEHLE Telegram storage (Edge Functions par background kaam response ke baad mar jata hai)
       return send(res, 201, { post: serializePost(post) });
@@ -1095,9 +1145,32 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 15, min: 15,
+      return send(res, 200, { ok: true, latest: 16, min: 16,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v15 — Messages fix: requests, tez chat, Instagram wala blue tick, 100 naye wallpapers. Update karke hi app chalega.' });
+        notes: 'v16 — Reel upload asal, story me video+song, chat me Tic-Tac-Toe game, online Active status. Update karke hi app chalega.' });
+    }
+    if (p === '/api/account/delete' && req.method === 'POST') {
+      // Play Store policy: user apna account + data khud delete kar sake.
+      const me = byName(body.username);
+      if (!me) return send(res, 404, { error: 'user nahi mila' });
+      if (!body.password || hash(String(body.password)) !== me.passwordHash) {
+        return send(res, 401, { error: 'password galat hai' });
+      }
+      const un = me.username;
+      db.users = db.users.filter(u => u.username !== un);
+      db.posts = db.posts.filter(x => x.username !== un);
+      db.stories = (db.stories || []).filter(x => x.username !== un);
+      db.messages = db.messages.filter(m => m.from !== un && m.to !== un);
+      db.notifications = (db.notifications || []).filter(n => n.from !== un && n.to !== un);
+      db.users.forEach(u => {
+        if (Array.isArray(u.followers)) u.followers = u.followers.filter(x => x !== un);
+        if (Array.isArray(u.following)) u.following = u.following.filter(x => x !== un);
+        if (Array.isArray(u.blockedUsers)) u.blockedUsers = u.blockedUsers.filter(x => x !== un);
+        if (Array.isArray(u.acceptedChats)) u.acceptedChats = u.acceptedChats.filter(x => x !== un);
+      });
+      db.posts.forEach(x => { if (Array.isArray(x.likedBy)) x.likedBy = x.likedBy.filter(v => v !== un); });
+      await saveDb();
+      return send(res, 200, { ok: true });
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
