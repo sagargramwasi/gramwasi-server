@@ -78,7 +78,6 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 
-const PORT = process.env.PORT || 8080;
 const ADMIN_KEY = process.env.ADMIN_KEY || 'gramwasi-admin-123';
 const DATA_FILE = process.env.GRAMWASI_DATA_FILE || (process.env.VERCEL || process.env.NETLIFY ? '/tmp/gramwasi-data.json' : path.join(__dirname, 'data.json'));
 
@@ -959,7 +958,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 12, min: 10,
+      return send(res, 200, { ok: true, latest: 13, min: 12,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
         notes: 'Naya server — online dot, story like, popular reels sab chalu. Update karke hi app chalega.' });
     }
@@ -1048,6 +1047,7 @@ async function handleRequest(req, res) {
   }
 }
 
+const server = http.createServer(handleRequest);
 
 ensureDb(); // warm-up load (handleRequest bhi har request par ensureDb karta hai)
 
