@@ -1157,9 +1157,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 18, min: 18,
+      return send(res, 200, { ok: true, latest: 19, min: 19,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v18 — Chat ka naya Telegram-style scene: neela theme, time + double tick, date chip, emoji. Update karke hi app chalega.' });
+        notes: 'v19 — Chat me Billi Panja (double-tap), sound effects aur 3-round Tic-Tac-Toe with Taj. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
