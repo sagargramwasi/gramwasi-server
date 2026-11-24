@@ -302,8 +302,9 @@ async function maybeImportTgPhotos() {
 }
 function serializePost(post) {
   migratePost(post);
-  const out = { ...post, likes: (post.baseLikes || 0) + post.likedBy.length,
-    likedBy: post.likedBy.slice(), user: post.username, author: pub(byName(post.username)) };
+  const pun = post.username || post.user || '';
+  const out = { ...post, username: pun, likes: (post.baseLikes || 0) + post.likedBy.length,
+    likedBy: post.likedBy.slice(), user: pun, author: pub(byName(pun)) };
   if (post.tgKind === 'video' && post.telegramFileId) out.video = '/api/media?postId=' + post.id;
   else if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
   return out;
@@ -624,6 +625,28 @@ function tgUploadVideo(buffer, caption) {
     r.write(payload); r.end();
   });
 }
+function tgUploadVoice(buffer, caption) {
+  // Voice note upload: pehle sendVoice (OGG), fail ho to sendDocument (webm bhi chalega).
+  function up(method, field, filename, ctype, pick) {
+    return new Promise(resolve => {
+      if (!TG_ON) return resolve(null);
+      const boundary = '----gw' + Date.now();
+      const head = Buffer.from('--' + boundary + '\r\nContent-Disposition: form-data; name="chat_id"\r\n\r\n' + TG_CHAT +
+        '\r\n--' + boundary + '\r\nContent-Disposition: form-data; name="caption"\r\n\r\n' + (caption || 'GramWasi voice') +
+        '\r\n--' + boundary + '\r\nContent-Disposition: form-data; name="' + field + '"; filename="' + filename + '"\r\nContent-Type: ' + ctype + '\r\n\r\n');
+      const tail = Buffer.from('\r\n--' + boundary + '--\r\n');
+      const payload = Buffer.concat([head, buffer, tail]);
+      const r = https.request({ host: 'api.telegram.org', path: '/bot' + TG_TOKEN + '/' + method,
+        method: 'POST', headers: { 'Content-Type': 'multipart/form-data; boundary=' + boundary, 'Content-Length': payload.length } },
+        resp => { let d = ''; resp.on('data', c => d += c); resp.on('end', () => {
+          try { const j = JSON.parse(d); resolve(pick(j) || null); } catch (e) { resolve(null); } }); });
+      r.on('error', () => resolve(null));
+      r.write(payload); r.end();
+    });
+  }
+  return up('sendVoice', 'voice', 'voice.ogg', 'audio/ogg', j => j.result && j.result.voice && j.result.voice.file_id)
+    .then(id => id || up('sendDocument', 'document', 'voice.webm', 'audio/webm', j => j.result && j.result.document && j.result.document.file_id));
+}
 async function tgStorePostImage(post) {
   if (!TG_ON || !post.image) return;
   try {
@@ -647,7 +670,7 @@ function tgMirrorMessage(m) {
   // asli text na server ko milta hai, na Telegram ko. 🔒
   const bodyText = String(m.text || '').startsWith('enc:')
     ? '🔒 encrypted message (sirf bhejne wala aur paane wala hi padh sakta hai)'
-    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : m.text);
+    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : (String(m.text || '').startsWith('postshare:') ? '📸 Post share kiya' : m.text));
   return tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
 }
 
@@ -672,6 +695,16 @@ async function handleRequest(req, res) {
   if (p === '/api/media' && req.method === 'GET') {
     // Telegram par stored photo ko wapas dikhana: /api/media?postId=<id>
     const wantId = url.searchParams.get('postId');
+    const msgId = url.searchParams.get('msgId');
+    if (msgId) {
+      const mm = (db.messages || []).find(x => String(x.id) === String(msgId));
+      if (mm && mm.telegramFileId && TG_ON) {
+        const j = await tgCall('getFile', { file_id: mm.telegramFileId });
+        const fp = j && j.result && j.result.file_path;
+        if (fp) { res.writeHead(302, { Location: 'https://api.telegram.org/file/bot' + TG_TOKEN + '/' + fp }); res.end(); return; }
+      }
+      send(res, 404, { error: 'media nahi mila' }); return;
+    }
     const post = db.posts.find(x => String(x.id) === String(wantId)) || (db.stories || []).find(x => String(x.id) === String(wantId));
     if (!post) { send(res, 404, { error: 'post nahi mila' }); return; }
     if (post.image) { res.writeHead(302, { Location: post.image }); res.end(); return; }
@@ -982,10 +1015,12 @@ async function handleRequest(req, res) {
     if (p === '/api/chat/edit-message' && req.method === 'POST') {
       const m = db.messages.find(x => x.id === Number(body.messageId));
       if (!m) return send(res, 404, { error: 'message nahi mila' });
-      if (m.from !== String(body.from || '')) return send(res, 403, { error: 'sirf apna message edit hoga' });
+      const editor = byName(body.from);
+      const ownerEdit = m.from !== String(body.from || '') && isOwnerUser(editor);
+      if (m.from !== String(body.from || '') && !ownerEdit) return send(res, 403, { error: 'sirf apna message edit hoga' });
       const nt = String(body.text || '').trim().slice(0, 1000);
-      if (!nt || nt.indexOf('ttt:') === 0 || m.text.indexOf('ttt:') === 0) return send(res, 400, { error: 'ye message edit nahi hoga' });
-      m.text = nt; m.edited = true; await saveDb();
+      if (!nt || nt.indexOf('ttt:') === 0 || m.text.indexOf('ttt:') === 0 || m.kind) return send(res, 400, { error: 'ye message edit nahi hoga' });
+      m.text = nt; m.edited = true; if (ownerEdit) m.editedBy = editor.username; await saveDb();
       return send(res, 200, { ok: true });
     }
     if (p === '/api/chat/react' && req.method === 'POST') {
@@ -1240,6 +1275,9 @@ async function handleRequest(req, res) {
         if (at >= c.lastAt) {
           c.lastAt = at; c.lastFrom = m.from;
           if (m.enc) { c.lastKind = 'enc'; c.lastText = null; }
+          else if (m.kind === 'image') { c.lastKind = 'image'; c.lastText = '📷 Photo'; }
+          else if (m.kind === 'voice') { c.lastKind = 'voice'; c.lastText = '🎤 Voice message'; }
+          else if (String(m.text || '').startsWith('postshare:')) { c.lastKind = 'text'; c.lastText = '📸 Post share kiya'; }
           else if (String(m.text || '').startsWith('voice:')) { c.lastKind = 'voice'; c.lastText = String(m.text).slice(0, 80); }
           else { c.lastKind = 'text'; c.lastText = String(m.text || '').slice(0, 80); }
         }
@@ -1293,9 +1331,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 24, min: 24,
+      return send(res, 200, { ok: true, latest: 25, min: 25,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v24 — Bhagwan photos + saari posts ab feed aur search me dikhengi. Update karke hi app chalega.' });
+        notes: 'v25 — Chat me photo + voice message, share seedha DM me, owner edit. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
@@ -1322,14 +1360,40 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/chat/send' && req.method === 'POST') {
       const from = byName(body.from), to = byName(body.to);
-      if (!from || !to || !body.text) return send(res, 400, { error: 'bad message' });
+      const hasText = !!(body.text && String(body.text).trim());
+      const hasImg = typeof body.image === 'string' && body.image.indexOf('data:image') === 0;
+      const hasAud = typeof body.audio === 'string' && body.audio.indexOf('data:audio') === 0;
+      if (!from || !to || (!hasText && !hasImg && !hasAud)) return send(res, 400, { error: 'bad message' });
       // Kisi ek taraf se bhi block hai to message nahi jayega.
       if ((from.blockedUsers || []).indexOf(to.username) >= 0 ||
           (to.blockedUsers || []).indexOf(from.username) >= 0) {
         return send(res, 403, { error: 'blocked' });
       }
-      const m = { id: db.seq++, from: from.username, to: to.username, text: String(body.text), at: Date.now(), read: false };
+      const m = { id: db.seq++, from: from.username, to: to.username, text: hasText ? String(body.text) : (hasImg ? '📷 Photo' : '🎤 Voice message'), at: Date.now(), read: false };
       if (body.enc) m.enc = true; // E2EE payload hai — inbox me kind 'enc' dikhega, text snippet nahi
+      if (hasImg) {
+        try {
+          const b64 = body.image.split(',')[1] || '';
+          const buf = Buffer.from(b64, 'base64');
+          if (buf.length > 9 * 1024 * 1024) return send(res, 400, { error: 'photo bahut badi hai' });
+          const fid = await tgUploadPhoto(buf, '💬 ' + from.username + ' → ' + to.username + ' (chat photo)');
+          m.kind = 'image';
+          if (fid) m.telegramFileId = fid; else if (buf.length < 5 * 1024 * 1024) m.imageData = body.image;
+          else return send(res, 502, { error: 'photo upload fail — dobara try karo' });
+        } catch (e) { return send(res, 400, { error: 'photo samajh nahi aayi' }); }
+      }
+      if (hasAud) {
+        try {
+          const b64 = body.audio.split(',')[1] || '';
+          const buf = Buffer.from(b64, 'base64');
+          if (buf.length > 4 * 1024 * 1024) return send(res, 400, { error: 'voice note bahut lamba hai' });
+          const fid = await tgUploadVoice(buf, '💬 ' + from.username + ' → ' + to.username + ' (voice)');
+          m.kind = 'voice';
+          m.audioDur = Math.max(0, Math.min(600, Number(body.audioDur) || 0));
+          if (fid) m.telegramFileId = fid; else if (buf.length < 3 * 1024 * 1024) m.audioData = body.audio;
+          else return send(res, 502, { error: 'voice upload fail — dobara try karo' });
+        } catch (e) { return send(res, 400, { error: 'voice samajh nahi aaya' }); }
+      }
       db.messages.push(m); await saveDb();
       try { await tgMirrorMessage(m); } catch (e) { /* Telegram fail ho to bhi chat send fail nahi hoga */ } // Telegram par backup copy (free storage)
       return send(res, 201, { message: m });
