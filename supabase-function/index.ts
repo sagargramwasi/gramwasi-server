@@ -101,7 +101,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
-let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], seq: 1 };
+let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], signals: [], seq: 1 };
 let dbReady = false;   // pehli load koshish ho chuki hai
 let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
 let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
@@ -111,7 +111,7 @@ let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
 let dbLoadOk = false;  // Supabase se ASAL data load hua hai — jab tak false, ye instance save NAHI karega (blind instance kabhi asli data overwrite nahi kar sakta)
 
 function seedData() {
-  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], seq: 1 };
+  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], signals: [], seq: 1 };
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
@@ -240,7 +240,7 @@ function ensureWallpaperSeeds() {
   } catch (e) { console.warn('[wp15] seed fail:', (e && e.message) || e); }
 }
 function normalizeDb(d) {
-  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
+  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], signals: [], seq: 1 };
   if (d && typeof d === 'object') {
     if (Array.isArray(d.users)) out.users = d.users;
     if (Array.isArray(d.posts)) out.posts = d.posts;
@@ -252,6 +252,7 @@ function normalizeDb(d) {
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
     if (d.wpSeededV15 === true) out.wpSeededV15 = true;
     if (Array.isArray(d.owners)) out.owners = d.owners;
+    if (Array.isArray(d.signals)) out.signals = d.signals;
     if (typeof d.tgOffset === 'number') out.tgOffset = d.tgOffset;
     if (typeof d.tgLastCheck === 'number') out.tgLastCheck = d.tgLastCheck;
   }
@@ -415,7 +416,7 @@ function ensureDb() { return loadDb(false); }
 // tabhi refresh; apna save chal raha ho to refresh skip (purana data na aaye).
 async function refreshIfStale(p, method) {
   if (!SUPABASE_ON || method !== 'GET') return;
-  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/chat/inbox' && p !== '/api/notifications' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover') return;
+  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/chat/inbox' && p !== '/api/notifications' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover' && p !== '/api/call/signals') return;
   if (pendingSaves > 0) return;
   if (Date.now() - lastLoadAt > 4000) await loadDb(true);
 }
@@ -1335,6 +1336,7 @@ async function handleRequest(req, res) {
           else if (m.kind === 'voice') { c.lastKind = 'voice'; c.lastText = '🎤 Voice message'; }
           else if (String(m.text || '').startsWith('postshare:')) { c.lastKind = 'text'; c.lastText = '📸 Post share kiya'; }
           else if (String(m.text || '').startsWith('profile:')) { c.lastKind = 'text'; c.lastText = '👤 Profile share kiya'; }
+          else if (String(m.text || '').startsWith('call:')) { c.lastKind = 'text'; c.lastText = '📞 Call'; }
           else if (String(m.text || '').startsWith('voice:')) { c.lastKind = 'voice'; c.lastText = String(m.text).slice(0, 80); }
           else { c.lastKind = 'text'; c.lastText = String(m.text || '').slice(0, 80); }
         }
@@ -1388,9 +1390,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 31, min: 31,
+      return send(res, 200, { ok: true, latest: 32, min: 32,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 1.4 — Naya home design, Following/Reels tabs, YouTube Shorts.' });
+        notes: 'Version 1.5 — Video call, chat mic logo, smooth Shorts.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
@@ -1456,6 +1458,41 @@ async function handleRequest(req, res) {
       db.messages.push(m); await saveDb();
       try { await tgMirrorMessage(m); } catch (e) { /* Telegram fail ho to bhi chat send fail nahi hoga */ } // Telegram par backup copy (free storage)
       return send(res, 201, { message: m });
+    }
+    // ===== v1.5: WebRTC call signaling =====
+    // Signals db.signals me rehte hain (chat ki tarah db-backed, isliye
+    // multiple Edge Function instances par bhi reliable) lekin chat se alag:
+    // poll ka payload sirf signals hota hai (poori chat history nahi uthti),
+    // 120s TTL par purane signals prune ho jate hain, aur koi signal kabhi
+    // chat bubble / Telegram mirror me nahi jata.
+    if (p === '/api/call/signal' && req.method === 'POST') {
+      const from = byName(body.from), to = byName(body.to);
+      if (!from || !to) return send(res, 400, { error: 'from/to galat hai' });
+      let payload = body.payload;
+      if (typeof payload === 'string') { try { payload = JSON.parse(payload); } catch (e) { return send(res, 400, { error: 'payload JSON nahi hai' }); } }
+      if (!payload || typeof payload !== 'object' || !payload.t || !payload.callid) {
+        return send(res, 400, { error: 'payload me t aur callid chahiye' });
+      }
+      if (JSON.stringify(payload).length > 12000) return send(res, 413, { error: 'payload bahut bada hai' });
+      if (!Array.isArray(db.signals)) db.signals = [];
+      const cutS = Date.now() - 120000;
+      db.signals = db.signals.filter(x => x && typeof x.at === 'number' && x.at >= cutS);
+      const sig = { id: db.seq++, from: from.username, to: to.username, payload, at: Date.now() };
+      db.signals.push(sig);
+      if (db.signals.length > 200) db.signals = db.signals.slice(-200);
+      await saveDb();
+      return send(res, 201, { ok: true, signal: sig });
+    }
+    if (p === '/api/call/signals' && req.method === 'GET') {
+      const me = String(url.searchParams.get('user') || '').toLowerCase().trim();
+      const other = String(url.searchParams.get('with') || '').toLowerCase().trim();
+      const since = Number(url.searchParams.get('since') || 0) || 0;
+      if (!me) return send(res, 400, { error: 'user chahiye' });
+      if (!Array.isArray(db.signals)) db.signals = [];
+      const cutS = Date.now() - 120000;
+      const list = db.signals.filter(x => x && typeof x.at === 'number' && x.at >= cutS && x.id > since &&
+        (other ? ((x.from === me && x.to === other) || (x.from === other && x.to === me)) : x.to === me));
+      return send(res, 200, { ok: true, signals: list });
     }
     // Admin endpoints
     if (p.startsWith('/api/admin/')) {
@@ -1542,6 +1579,7 @@ async function handleRequest(req, res) {
 }
 
 const server = http.createServer(handleRequest);
+
 // ============================================================================
 // ===== Fetch adapter: Supabase Edge Function <-> Node-style handleRequest ====
 // ============================================================================
