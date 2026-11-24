@@ -671,7 +671,8 @@ async function handleRequest(req, res) {
   if (p === '/' || p === '/health') { send(res, 200, { app: 'GramWasi', ok: true, telegramStorage: TG_ON, storage: SUPABASE_ON ? 'supabase' : 'file' }); return; }
   if (p === '/api/media' && req.method === 'GET') {
     // Telegram par stored photo ko wapas dikhana: /api/media?postId=<id>
-    const post = db.posts.find(x => x.id === Number(url.searchParams.get('postId'))) || (db.stories || []).find(x => x.id === Number(url.searchParams.get('postId')));
+    const wantId = url.searchParams.get('postId');
+    const post = db.posts.find(x => String(x.id) === String(wantId)) || (db.stories || []).find(x => String(x.id) === String(wantId));
     if (!post) { send(res, 404, { error: 'post nahi mila' }); return; }
     if (post.image) { res.writeHead(302, { Location: post.image }); res.end(); return; }
     if (post.telegramFileId && TG_ON) {
