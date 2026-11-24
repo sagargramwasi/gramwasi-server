@@ -1388,7 +1388,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 29, min: 25,
+      return send(res, 200, { ok: true, latest: 29, min: 29,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
         notes: 'Version 1.2 — Notes, DM requests fix, voice pakka, chat menu asaan. Update kar lo.' });
     }
