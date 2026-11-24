@@ -522,9 +522,19 @@ async function sendMail(to, subject, text) {
   } catch (e) { /* mail fail ho to demo fallback neeche hai */ }
   return false;
 }
+function avatarOut(u) {
+  // Avatar DB me data-URL (badi base64 photo) hai — API me seedha bhejne se
+  // /api/users 60KB+ ho jata tha aur slow net par response kat jata tha
+  // (profile par 0/0/0 ki asal jad). Ab sirf ek halki URL jati hai.
+  const av = u && u.avatar;
+  if (av && av.indexOf('data:') === 0 && process.env.SUPABASE_URL) {
+    return process.env.SUPABASE_URL.replace(/\/+$/, '') + '/functions/v1/api/avatar?u=' + encodeURIComponent(u.username);
+  }
+  return av || '';
+}
 function pub(u) {
   if (!u) return null;
-  return { id: u.id, username: u.username, name: u.name, bio: u.bio, avatar: u.avatar,
+  return { id: u.id, username: u.username, name: u.name, bio: u.bio, avatar: avatarOut(u),
     email: u.email || '', emailVerified: !!u.emailVerified,
     publicKey: u.publicKey || null,
     verified: u.verified, blocked: u.blocked,
@@ -670,7 +680,7 @@ function tgMirrorMessage(m) {
   // asli text na server ko milta hai, na Telegram ko. 🔒
   const bodyText = String(m.text || '').startsWith('enc:')
     ? '🔒 encrypted message (sirf bhejne wala aur paane wala hi padh sakta hai)'
-    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : (String(m.text || '').startsWith('postshare:') ? '📸 Post share kiya' : m.text));
+    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : (String(m.text || '').startsWith('postshare:') ? '📸 Post share kiya' : (String(m.text || '').startsWith('profile:') ? '👤 Profile share kiya' : m.text)));
   return tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
 }
 
@@ -692,6 +702,20 @@ async function handleRequest(req, res) {
     }
   }
   if (p === '/' || p === '/health') { send(res, 200, { app: 'GramWasi', ok: true, telegramStorage: TG_ON, storage: SUPABASE_ON ? 'supabase' : 'file' }); return; }
+  if (p === '/api/avatar' && req.method === 'GET') {
+    const un = String(url.searchParams.get('u') || '').toLowerCase();
+    const usr = byName(un);
+    const av = usr && usr.avatar;
+    if (!av) { send(res, 404, { error: 'avatar nahi hai' }); return; }
+    if (av.indexOf('data:') === 0) {
+      const mm = av.match(/^data:([^;,]+)?(;base64)?,(.*)$/s);
+      if (!mm) { send(res, 404, { error: 'avatar kharab hai' }); return; }
+      const buf = mm[2] ? Buffer.from(mm[3], 'base64') : Buffer.from(decodeURIComponent(mm[3]));
+      res.writeHead(200, { 'Content-Type': mm[1] || 'image/jpeg', 'Content-Length': buf.length, 'Cache-Control': 'public, max-age=3600' });
+      res.end(buf); return;
+    }
+    res.writeHead(302, { Location: av }); res.end(); return;
+  }
   if (p === '/api/media' && req.method === 'GET') {
     // Telegram par stored photo ko wapas dikhana: /api/media?postId=<id>
     const wantId = url.searchParams.get('postId');
@@ -1278,6 +1302,7 @@ async function handleRequest(req, res) {
           else if (m.kind === 'image') { c.lastKind = 'image'; c.lastText = '📷 Photo'; }
           else if (m.kind === 'voice') { c.lastKind = 'voice'; c.lastText = '🎤 Voice message'; }
           else if (String(m.text || '').startsWith('postshare:')) { c.lastKind = 'text'; c.lastText = '📸 Post share kiya'; }
+          else if (String(m.text || '').startsWith('profile:')) { c.lastKind = 'text'; c.lastText = '👤 Profile share kiya'; }
           else if (String(m.text || '').startsWith('voice:')) { c.lastKind = 'voice'; c.lastText = String(m.text).slice(0, 80); }
           else { c.lastKind = 'text'; c.lastText = String(m.text || '').slice(0, 80); }
         }
@@ -1331,9 +1356,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 27, min: 25,
+      return send(res, 200, { ok: true, latest: 28, min: 25,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v27 — Voice note ab Telegram style me: gol play button + waveform. Send button bhi pura saaf dikhega.' });
+        notes: 'v28 — Profile naya Instagram style + followers count fix + unfollow asaan. Update kar lo.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
