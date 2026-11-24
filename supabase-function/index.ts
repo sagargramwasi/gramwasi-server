@@ -256,6 +256,9 @@ function normalizeDb(d) {
     if (typeof d.tgOffset === 'number') out.tgOffset = d.tgOffset;
     if (typeof d.tgLastCheck === 'number') out.tgLastCheck = d.tgLastCheck;
   }
+  // Migration: purane user records me display name nahi hota tha — name na
+  // ho to username hi name maan lo (app har user ka name dikhata hai).
+  out.users.forEach(u => { if (u && typeof u === 'object' && !u.name) u.name = u.username; });
   out.posts.forEach(migratePost);
   ensureSeedReels(out);
   return out;
@@ -551,6 +554,38 @@ function pub(u) {
     followerList: u.followers || [], followingList: u.following || [] };
 }
 function byName(name) { return db.users.find(u => u.username === String(name || '').toLowerCase()); }
+// Username badalne ka cascade: username pure db me key/reference ki tarah
+// ghumta hai — user record, posts (username + legacy user + likedBy +
+// comments ke username/user), stories (username/views/likes), messages
+// (from/to), har user ke followers/following/acceptedChats/blockedUsers
+// arrays + chatCleared ki keys, notifications (user/from), reports
+// (by/postUser), owners list, signals (from/to), pending signup ki key.
+// Ek hi jagah rakho taaki koi reference purane naam par na reh jaye.
+function cascadeUsernameRename(oldUn, newUn) {
+  if (!oldUn || !newUn || oldUn === newUn) return;
+  const swap = (arr) => { if (Array.isArray(arr)) for (let i = 0; i < arr.length; i++) if (arr[i] === oldUn) arr[i] = newUn; };
+  const rec = byName(oldUn);
+  if (rec) rec.username = newUn;
+  (db.users || []).forEach(u => {
+    swap(u.followers); swap(u.following); swap(u.acceptedChats); swap(u.blockedUsers);
+    if (u.chatCleared && typeof u.chatCleared === 'object' && Object.prototype.hasOwnProperty.call(u.chatCleared, oldUn)) {
+      u.chatCleared[newUn] = u.chatCleared[oldUn]; delete u.chatCleared[oldUn];
+    }
+  });
+  (db.posts || []).forEach(post => {
+    if (post.username === oldUn) post.username = newUn;
+    if (post.user === oldUn) post.user = newUn;
+    swap(post.likedBy);
+    (post.comments || []).forEach(c => { if (c && c.username === oldUn) c.username = newUn; if (c && c.user === oldUn) c.user = newUn; });
+  });
+  (db.stories || []).forEach(st => { if (st.username === oldUn) st.username = newUn; swap(st.views); swap(st.likes); });
+  (db.messages || []).forEach(m => { if (m.from === oldUn) m.from = newUn; if (m.to === oldUn) m.to = newUn; });
+  (db.notifications || []).forEach(n => { if (n.user === oldUn) n.user = newUn; if (n.from === oldUn) n.from = newUn; });
+  (db.reports || []).forEach(r => { if (r.by === oldUn) r.by = newUn; if (r.postUser === oldUn) r.postUser = newUn; });
+  swap(db.owners);
+  (db.signals || []).forEach(sg => { if (sg.from === oldUn) sg.from = newUn; if (sg.to === oldUn) sg.to = newUn; });
+  if (db.pending && db.pending[oldUn]) { db.pending[newUn] = db.pending[oldUn]; db.pending[newUn].username = newUn; delete db.pending[oldUn]; }
+}
 // Admin ke liye rich user record. passwordHash KABHI nahi jata, aur E2EE
 // publicKey ki value bhi nahi — sirf hasKey boolean (key set hai ya nahi).
 function adminUser(u) {
@@ -903,6 +938,37 @@ async function handleRequest(req, res) {
       if (body.avatar !== undefined) u.avatar = body.avatar;
       await saveDb();
       return send(res, 200, { ok: true, user: pub(u) });
+    }
+    if (p === '/api/profile/name' && req.method === 'POST') {
+      // Display name badlo (username wahi rehta hai). Auth pattern baaki
+      // profile endpoints jaisa hi hai: sirf username se (password nahi).
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      const nm = String(body.name || '').trim().slice(0, 40);
+      if (!nm) return send(res, 400, { error: 'naam khali nahi ho sakta' });
+      u.name = nm; await saveDb();
+      return send(res, 200, { ok: true, user: pub(u) });
+    }
+    if (p === '/api/profile/rename' && req.method === 'POST') {
+      // KHUD ka username badlo (owner/rename se alag — wo sirf display name
+      // badalta hai aur owner power mangta hai). Validation: 3-20 chars,
+      // sirf lowercase akshar/number/dot/underscore, dot se shuru/khatm
+      // nahi. Dusra user ya pending signup pehle se rakhta ho to 409.
+      // Wahi username ho to no-op 200. Badalne par cascadeUsernameRename
+      // pure db me purana username naye se badal deta hai.
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      const nu = String(body.newUsername || '').toLowerCase().trim();
+      if (!/^[a-z0-9._]{3,20}$/.test(nu) || nu.startsWith('.') || nu.endsWith('.')) {
+        return send(res, 400, { error: 'username galat hai' });
+      }
+      if (nu === u.username) return send(res, 200, { ok: true, user: pub(u), username: nu });
+      if (byName(nu)) return send(res, 409, { error: 'ye username kisi aur ka hai' });
+      if (db.pending && db.pending[nu]) return send(res, 409, { error: 'ye username kisi aur ka hai' });
+      const oldUn = u.username;
+      cascadeUsernameRename(oldUn, nu);
+      await saveDb();
+      return send(res, 200, { ok: true, user: pub(u), username: nu, oldUsername: oldUn });
     }
     if (p === '/api/note' && req.method === 'POST') {
       const u = byName(body.username);
@@ -1391,9 +1457,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 34, min: 34,
+      return send(res, 200, { ok: true, latest: 35, min: 35,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 1.7 — Funny reels, sound, full-screen reels, reel share.' });
+        notes: 'Version 1.8 — Reel aur call fix.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
