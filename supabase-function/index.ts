@@ -79,6 +79,7 @@ const path = require('path');
 const crypto = require('crypto');
 
 const ADMIN_KEY = process.env.ADMIN_KEY || 'gramwasi-admin-123';
+const GW_OWNER = 'sagarjha'; // Owner account — sirf isko extra powers (rename/verify/delete)
 const DATA_FILE = process.env.GRAMWASI_DATA_FILE || (process.env.VERCEL || process.env.NETLIFY ? '/tmp/gramwasi-data.json' : path.join(__dirname, 'data.json'));
 
 // ---------- Storage ----------
@@ -246,6 +247,8 @@ function normalizeDb(d) {
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
     if (d.wpSeededV15 === true) out.wpSeededV15 = true;
+    if (typeof d.tgOffset === 'number') out.tgOffset = d.tgOffset;
+    if (typeof d.tgLastCheck === 'number') out.tgLastCheck = d.tgLastCheck;
   }
   out.posts.forEach(migratePost);
   ensureSeedReels(out);
@@ -268,6 +271,33 @@ function migratePost(post) {
   return post;
 }
 function postLikesCount(post) { migratePost(post); return (post.baseLikes || 0) + post.likedBy.length; }
+// Telegram group (Rovenox) me Sagar jo photo dalta hai, wo GramWasi feed me
+// apne aap aa jaye — getUpdates se (bot ke apne messages skip). 20s throttle.
+let tgBotId = null;
+async function maybeImportTgPhotos() {
+  if (!TG_ON) return;
+  const now = Date.now();
+  if (now - (db.tgLastCheck || 0) < 20000) return;
+  db.tgLastCheck = now;
+  try {
+    if (tgBotId === null) { const me = await tgCall('getMe', {}); tgBotId = me && me.result ? me.result.id : 0; }
+    const upd = await tgCall('getUpdates', { offset: db.tgOffset || 0, timeout: 0, allowed_updates: ['message'] });
+    const list = (upd && upd.result) || [];
+    let changed = false;
+    for (const u of list) {
+      db.tgOffset = Math.max(db.tgOffset || 0, (u.update_id || 0) + 1);
+      const m = u.message;
+      if (!m || String(m.chat && m.chat.id) !== String(TG_CHAT)) continue;
+      if (!m.photo || !m.photo.length) continue;
+      if (m.from && m.from.is_bot) continue;
+      if (db.posts.some(p => p.tgMsgId === m.message_id)) continue;
+      const ph = m.photo[m.photo.length - 1];
+      db.posts.unshift({ id: db.seq++, username: GW_OWNER, image: '', telegramFileId: ph.file_id, tgKind: 'photo', caption: m.caption || '', createdAt: (m.date || 0) * 1000 || Date.now(), likedBy: [], baseLikes: 0, comments: [], tgMsgId: m.message_id, imported: true });
+      changed = true;
+    }
+    if (changed || list.length) await saveDb();
+  } catch (e) { /* Telegram fail ho to feed normal chalti rahegi */ }
+}
 function serializePost(post) {
   migratePost(post);
   const out = { ...post, likes: (post.baseLikes || 0) + post.likedBy.length,
@@ -832,6 +862,47 @@ async function handleRequest(req, res) {
       await saveDb();
       return send(res, 201, { ok: true, story });
     }
+    if (p === '/api/admin/import-gods' && req.method === 'POST') {
+      // Bhagwan (Wikimedia) seed photos ko Telegram par copy karo — Wikimedia
+      // seedha hotlink par 429 deta hai, isliye app me photo nahi khulti thi.
+      // Ek call me max 6; bache hue ke liye dobara call karo (idempotent).
+      if (!isAdmin) return send(res, 401, { error: 'admin key galat' });
+      const gods = db.posts.filter(x => x.image && x.image.indexOf('wikimedia') >= 0 && !x.telegramFileId);
+      let done = 0;
+      for (const post of gods.slice(0, 6)) {
+        const cleanUrl = post.image.split('?')[0];
+        const j = await tgCall('sendPhoto', { chat_id: TG_CHAT, photo: cleanUrl, caption: '🙏 GramWasi bhagwan photo — ' + (post.caption || '') });
+        const ph = j && j.result && j.result.photo;
+        if (ph) { post.telegramFileId = ph[ph.length - 1].file_id; post.image = ''; done++; }
+      }
+      if (done) await saveDb();
+      return send(res, 200, { ok: true, done, remaining: gods.length - done });
+    }
+    if (p === '/api/owner/rename' && req.method === 'POST') {
+      const by = byName(body.by);
+      if (!by || by.username !== GW_OWNER) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
+      const t = byName(body.target);
+      const nm = String(body.name || '').trim().slice(0, 40);
+      if (!t || !nm) return send(res, 400, { error: 'target ya naam galat hai' });
+      t.name = nm; await saveDb();
+      return send(res, 200, { ok: true, user: pub(t) });
+    }
+    if (p === '/api/owner/verify' && req.method === 'POST') {
+      const by = byName(body.by);
+      if (!by || by.username !== GW_OWNER) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
+      const t = byName(body.target);
+      if (!t) return send(res, 404, { error: 'user nahi mila' });
+      t.verified = !!body.verified; await saveDb();
+      return send(res, 200, { ok: true, user: pub(t) });
+    }
+    if (p === '/api/owner/delete-post' && req.method === 'POST') {
+      const by = byName(body.by);
+      if (!by || by.username !== GW_OWNER) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
+      const idx = db.posts.findIndex(x => String(x.id) === String(body.postId));
+      if (idx < 0) return send(res, 404, { error: 'post nahi mila' });
+      db.posts.splice(idx, 1); await saveDb();
+      return send(res, 200, { ok: true });
+    }
     if (p === '/api/stories' && req.method === 'GET') {
       // Sirf pichhle 24 ghante ki stories, user ke hisaab se group karke —
       // sabse nayi story wala group sabse upar. Expire ho chuki stories
@@ -998,6 +1069,7 @@ async function handleRequest(req, res) {
       return send(res, 200, { ok: true, blocked });
     }
     if (p === '/api/posts' && req.method === 'GET') {
+      await maybeImportTgPhotos();
       const posts = db.posts.slice().reverse().map(serializePost);
       return send(res, 200, { posts });
     }
@@ -1178,9 +1250,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 20, min: 20,
+      return send(res, 200, { ok: true, latest: 21, min: 21,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v20 — Game ke Taj ab sabko dikhega, New Game par purane game saaf, story like aur saaf. Update karke hi app chalega.' });
+        notes: 'v21 — Back button fix, game ka ek hi panel + fire KING, bhagwan photos fix, Telegram photo seedha app me, owner powers. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
