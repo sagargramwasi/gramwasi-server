@@ -647,7 +647,7 @@ function tgMirrorMessage(m) {
   // asli text na server ko milta hai, na Telegram ko. 🔒
   const bodyText = String(m.text || '').startsWith('enc:')
     ? '🔒 encrypted message (sirf bhejne wala aur paane wala hi padh sakta hai)'
-    : m.text;
+    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : m.text);
   return tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
 }
 
@@ -1293,9 +1293,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 22, min: 22,
+      return send(res, 200, { ok: true, latest: 23, min: 23,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v22 — Message delete/edit, official reaction, panel se owner power. Update karke hi app chalega.' });
+        notes: 'v23 — Followers fix, Chat Lock (PIN), saaf-suthra app. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
