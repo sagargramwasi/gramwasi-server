@@ -10,47 +10,30 @@
   .screen{position:absolute;inset:0;display:none;flex-direction:column}
   .screen.on{display:flex}
   /* ---------- CHAT (Telegram style) ---------- */
-  #chatScreen{background:#050b18}
+  #chatScreen{background:#0e1621}
   .wp{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
   .chat-head{position:relative;display:flex;align-items:center;gap:8px;padding:10px 10px 4px;z-index:3}
-  .hbtn{width:48px;height:48px;border-radius:50%;background:rgba(8,20,38,.9);border:2px solid rgba(56,189,248,.9);box-shadow:0 0 14px rgba(56,189,248,.65),inset 0 0 10px rgba(56,189,248,.3);color:#fff;font-size:19px;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
-  .hpill{flex:1;background:rgba(8,20,38,.9);border:2px solid rgba(56,189,248,.9);box-shadow:0 0 16px rgba(56,189,248,.55),inset 0 0 12px rgba(56,189,248,.22);border-radius:28px;display:flex;align-items:center;gap:10px;padding:5px 14px 5px 6px;min-width:0}
+  .hbtn{width:48px;height:48px;border-radius:50%;background:#17212b;border:none;color:#fff;font-size:19px;flex:none;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .hpill{flex:1;background:#17212b;border-radius:28px;display:flex;align-items:center;gap:10px;padding:5px 14px 5px 6px;min-width:0}
   .hpill .av{width:40px;height:40px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#ef4444);display:flex;align-items:center;justify-content:center;font-size:18px;flex:none}
   .hpill .nm{font-weight:700;font-size:16px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-  .avw{position:relative;flex:none}
-  .avcrown{position:absolute;top:-12px;left:-5px;font-size:16px;transform:rotate(-14deg);filter:drop-shadow(0 0 5px rgba(250,204,21,.95));z-index:3}
-  .tick{vertical-align:-2px}
-  .hpill .st{font-size:12.5px;color:#8fd8ff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .hpill .st{font-size:12.5px;color:#7f8c98;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hpill2{background:#17212b;border-radius:28px;display:flex;align-items:center;padding:5px 8px;flex:none}
   .hpill2 button{width:40px;height:40px;border-radius:50%;border:none;background:transparent;color:#fff;font-size:18px;cursor:pointer}
   .hpill2 button:active{background:rgba(255,255,255,.12)}
   .chat-body{position:relative;flex:1;padding:12px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px;z-index:2}
-  .dchip{align-self:center;background:rgba(6,18,36,.88);border:1.6px solid rgba(56,189,248,.85);box-shadow:0 0 12px rgba(56,189,248,.45),inset 0 0 8px rgba(56,189,248,.25);padding:5px 13px;border-radius:14px;font-size:13px;font-weight:600;color:#eaf6ff;position:relative;z-index:2}
-  .schip{align-self:center;background:rgba(6,18,36,.88);border:1.6px solid rgba(56,189,248,.85);box-shadow:0 0 12px rgba(56,189,248,.45),inset 0 0 8px rgba(56,189,248,.25);padding:6px 13px;border-radius:14px;font-size:13px;color:#cfeaff;text-align:center;position:relative;z-index:2}
-  .msg{max-width:75%;padding:9px 12px;border-radius:14px;font-size:15px;line-height:1.35;box-shadow:0 1px 2px rgba(0,0,0,.25);position:relative;z-index:2}
-  .msg.them{background:rgba(10,25,47,.92);border:1px solid rgba(56,189,248,.35);align-self:flex-start;border-bottom-left-radius:4px}
-  .msg.me{background:linear-gradient(135deg,#0ea5e9,#2563eb);border:1px solid rgba(125,211,252,.5);box-shadow:0 0 12px rgba(56,189,248,.35);align-self:flex-end;border-bottom-right-radius:4px}
+  .dchip{align-self:center;background:rgba(23,33,43,.88);padding:5px 13px;border-radius:14px;font-size:13px;font-weight:600;color:#dbe4ec}
+  .schip{align-self:center;background:rgba(23,33,43,.88);padding:6px 13px;border-radius:14px;font-size:13px;color:#aebac4;text-align:center}
+  .msg{max-width:75%;padding:9px 12px;border-radius:14px;font-size:15px;line-height:1.35;box-shadow:0 1px 2px rgba(0,0,0,.25)}
+  .msg.them{background:#182533;align-self:flex-start;border-bottom-left-radius:4px}
+  .msg.me{background:#2b5278;align-self:flex-end;border-bottom-right-radius:4px}
   .msg .tm{display:block;font-size:10.5px;opacity:.6;margin-top:3px;text-align:right}
-  .motif{position:absolute;top:36%;left:50%;transform:translate(-50%,-50%);z-index:1;text-align:center;pointer-events:none}
-  .motif .plane{filter:drop-shadow(0 0 16px rgba(56,189,248,.95)) drop-shadow(0 0 44px rgba(37,99,235,.6))}
-  .motif .gw{margin-top:10px;font-size:27px;font-weight:800;font-style:italic;letter-spacing:1px;color:#bfe9ff;text-shadow:0 0 14px rgba(56,189,248,.95),0 0 34px rgba(37,99,235,.7)}
-  .motif .tag{font-size:13.5px;font-style:italic;color:#7dd3fc;text-shadow:0 0 10px rgba(56,189,248,.8);margin-top:2px}
   .demo-note{position:relative;z-index:2;margin:4px 12px 10px;padding:11px 13px;background:rgba(124,58,237,.15);border:1px solid rgba(124,58,237,.5);border-radius:12px;font-size:13.5px;line-height:1.45}
   .chat-foot{position:relative;z-index:3;padding:6px 10px 14px}
-  .bar{position:relative;border-radius:999px;padding:3px;background:linear-gradient(90deg,#e879f9,#7c3aed,#2563eb,#22d3ee);box-shadow:0 0 22px rgba(59,130,246,.6),0 0 38px rgba(168,85,247,.45)}
-  .bar-in{background:linear-gradient(180deg,#0a1830,#060f22);border-radius:999px;display:flex;align-items:center;gap:7px;padding:6px 7px 6px 8px;position:relative}
-  .emo{position:relative;width:47px;height:47px;border-radius:50%;border:2px solid #8b5cf6;background:radial-gradient(circle at 34% 26%,#2b3b57,#101a2e 70%);box-shadow:0 0 14px rgba(139,92,246,.85),inset 0 0 10px rgba(139,92,246,.4);display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer}
-  .emo .crown{position:absolute;top:-13px;left:-7px;font-size:19px;transform:rotate(-14deg);filter:drop-shadow(0 0 6px rgba(250,204,21,.95))}
-  .vdiv{width:2.5px;height:27px;border-radius:2px;background:#38bdf8;box-shadow:0 0 9px rgba(56,189,248,.95);flex:none;margin-left:-4px}
-  .bar .txt{flex:1;color:#9fb0c1;font-size:16.5px;padding-left:3px;min-width:0}
-  .hearts{position:relative;width:44px;height:34px;flex:none}
-  .hearts svg{position:absolute}
-  .att{width:45px;height:45px;border-radius:50%;border:1.6px solid rgba(147,197,253,.55);background:rgba(30,41,59,.6);display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer;box-shadow:inset 0 0 9px rgba(59,130,246,.3)}
-  .nmic{position:relative;width:55px;height:55px;border-radius:50%;border:2px solid rgba(125,211,252,.85);background:radial-gradient(ellipse 65% 42% at 34% 16%,rgba(255,255,255,.9),rgba(255,255,255,0) 60%),linear-gradient(150deg,#38bdf8,#2563eb 65%,#1d4ed8);box-shadow:inset 0 0 14px rgba(255,255,255,.3),0 0 20px rgba(59,130,246,.95);display:flex;align-items:center;justify-content:center;flex:none;cursor:pointer}
-  .nmic::after{content:"";position:absolute;width:124%;height:44%;left:-12%;top:30%;border:2px solid rgba(103,232,249,.85);border-radius:50%;transform:rotate(-16deg);box-shadow:0 0 10px rgba(34,211,238,.7);pointer-events:none}
-  .nmic svg{position:relative;z-index:2}
-  .fh{position:absolute;font-size:15px;pointer-events:none;animation:floaty 3.4s ease-in-out infinite;filter:drop-shadow(0 0 6px rgba(217,70,239,.8));z-index:4}
-  @keyframes floaty{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+  .bar{background:#17212b;border-radius:26px;display:flex;align-items:center;gap:4px;padding:4px 5px 4px 8px}
+  .bar .ic{width:40px;height:40px;border-radius:50%;border:none;background:transparent;color:#8b98a5;font-size:19px;flex:none}
+  .bar .txt{flex:1;color:#7f8c98;font-size:15.5px;padding-left:2px;min-width:0}
+  .bar .mic{width:46px;height:46px;border-radius:50%;border:none;background:#2AABEE;color:#fff;font-size:20px;flex:none;box-shadow:0 3px 10px rgba(42,171,238,.45)}
   /* ---------- CALL (Telegram style) ---------- */
   #callScreen{background:#000;transform:translateY(102%);transition:transform .38s ease;z-index:40}
   #callScreen.on{display:block;transform:translateY(0)}
@@ -70,26 +53,14 @@
   .call-controls{position:absolute;left:0;right:0;bottom:0;z-index:6;padding:16px 6px 62px;background:linear-gradient(transparent,rgba(0,0,0,.55));display:flex;justify-content:space-around;max-width:460px;margin:0 auto;animation:rise .45s ease}
   @keyframes rise{from{transform:translateY(26px);opacity:0}to{transform:none;opacity:1}}
   .g-wrap{position:relative;display:flex;flex-direction:column;align-items:center}
-  .gbtn{width:58px;height:58px;border-radius:50%;border:2px solid rgba(255,255,255,.38);position:relative;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s,filter .2s;color:#fff}
-  .gbtn svg{position:relative;z-index:2;filter:drop-shadow(0 2px 3px rgba(0,0,0,.35))}
-  .gbtn::after{content:"";position:absolute;width:126%;height:44%;left:-13%;top:30%;border:2px solid;border-radius:50%;transform:rotate(-16deg);opacity:.65;pointer-events:none;z-index:1}
+  .gbtn{width:56px;height:56px;border-radius:50%;border:3.5px solid transparent;background:linear-gradient(#ffffff,#ffffff) padding-box,linear-gradient(135deg,#e879f9,#7c3aed) border-box;box-shadow:0 0 16px rgba(168,85,247,.5),0 6px 14px rgba(0,0,0,.35);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:transform .12s,filter .2s;position:relative}
   .gbtn:active{transform:scale(.9)}
-  .gbtn.off{filter:saturate(.3) brightness(.78)}
+  .gbtn.off{filter:saturate(.25) brightness(.93)}
   .gbtn.flash{transform:scale(.9)}
-  .gbtn.flip{background:radial-gradient(ellipse 65% 42% at 34% 16%,rgba(255,255,255,.95),rgba(255,255,255,0) 60%),radial-gradient(circle at 50% 125%,rgba(255,255,255,.35),rgba(255,255,255,0) 55%),linear-gradient(150deg,#c026d3,#6d28d9 45%,#2563eb 75%,#06b6d4);box-shadow:inset 0 0 20px rgba(255,255,255,.28),inset 0 -12px 20px rgba(0,0,0,.35),0 0 26px rgba(147,51,234,.85),0 10px 22px rgba(0,0,0,.45)}
-  .gbtn.flip::after{border-color:rgba(192,132,252,.9);box-shadow:0 0 12px rgba(168,85,247,.8)}
-  .gbtn.stopv{background:radial-gradient(ellipse 65% 42% at 34% 16%,rgba(255,255,255,.95),rgba(255,255,255,0) 60%),radial-gradient(circle at 50% 125%,rgba(255,255,255,.3),rgba(255,255,255,0) 55%),linear-gradient(150deg,#f87171,#b91c1c 55%,#450a0a);box-shadow:inset 0 0 20px rgba(255,255,255,.25),inset 0 -12px 20px rgba(0,0,0,.4),0 0 26px rgba(239,68,68,.85),0 10px 22px rgba(0,0,0,.45)}
-  .gbtn.stopv::after{border-color:rgba(248,113,113,.9);box-shadow:0 0 12px rgba(239,68,68,.8)}
-  .gbtn.mute{background:radial-gradient(ellipse 65% 42% at 34% 16%,rgba(255,255,255,.95),rgba(255,255,255,0) 60%),radial-gradient(circle at 50% 125%,rgba(255,255,255,.3),rgba(255,255,255,0) 55%),linear-gradient(150deg,#4ade80,#059669 55%,#0f766e);box-shadow:inset 0 0 20px rgba(255,255,255,.25),inset 0 -12px 20px rgba(0,0,0,.35),0 0 26px rgba(34,197,94,.85),0 10px 22px rgba(0,0,0,.45)}
-  .gbtn.mute::after{border-color:rgba(74,222,128,.9);box-shadow:0 0 12px rgba(34,197,94,.8)}
-  .gbtn.end{width:66px;height:66px;background:radial-gradient(ellipse 65% 42% at 34% 16%,rgba(255,255,255,.95),rgba(255,255,255,0) 60%),radial-gradient(circle at 50% 125%,rgba(255,255,255,.32),rgba(255,255,255,0) 55%),linear-gradient(150deg,#fca5a5,#ef4444 45%,#b91c1c 80%);box-shadow:inset 0 0 22px rgba(255,255,255,.3),inset 0 -12px 22px rgba(0,0,0,.35),0 0 34px rgba(255,59,48,.95),0 10px 24px rgba(0,0,0,.5);animation:endpulse 1.6s infinite}
-  .gbtn.end::after{border-color:rgba(252,165,165,.95);box-shadow:0 0 14px rgba(255,59,48,.85)}
-  @keyframes endpulse{0%{box-shadow:inset 0 0 22px rgba(255,255,255,.3),inset 0 -12px 22px rgba(0,0,0,.35),0 0 20px rgba(255,59,48,.7),0 10px 24px rgba(0,0,0,.5)}50%{box-shadow:inset 0 0 22px rgba(255,255,255,.3),inset 0 -12px 22px rgba(0,0,0,.35),0 0 44px rgba(255,59,48,1),0 10px 24px rgba(0,0,0,.5)}100%{box-shadow:inset 0 0 22px rgba(255,255,255,.3),inset 0 -12px 22px rgba(0,0,0,.35),0 0 20px rgba(255,59,48,.7),0 10px 24px rgba(0,0,0,.5)}}
-  .gpill{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;padding:5px 12px;border-radius:999px;font-weight:800;font-size:12.5px;color:#fff;background:rgba(8,8,16,.78);letter-spacing:.3px}
-  .gpill.f{border:1.8px solid #a855f7;box-shadow:0 0 15px rgba(168,85,247,.75),inset 0 0 10px rgba(168,85,247,.35)}
-  .gpill.s{border:1.8px solid #ef4444;box-shadow:0 0 15px rgba(239,68,68,.75),inset 0 0 10px rgba(239,68,68,.35)}
-  .gpill.m{border:1.8px solid #22c55e;box-shadow:0 0 15px rgba(34,197,94,.75),inset 0 0 10px rgba(34,197,94,.35)}
-  .gpill.e{border:1.8px solid #ff3b30;box-shadow:0 0 15px rgba(255,59,48,.8),inset 0 0 10px rgba(255,59,48,.4)}
+  .gbtn.stopv{background:linear-gradient(#ffffff,#ffffff) padding-box,linear-gradient(135deg,#38bdf8,#2563eb) border-box;box-shadow:0 0 16px rgba(59,130,246,.5),0 6px 14px rgba(0,0,0,.35)}
+  .gbtn.mute{background:linear-gradient(#ffffff,#ffffff) padding-box,linear-gradient(135deg,#4ade80,#16a34a) border-box;box-shadow:0 0 16px rgba(34,197,94,.5),0 6px 14px rgba(0,0,0,.35)}
+  .gbtn.end{background:linear-gradient(#ffffff,#ffffff) padding-box,linear-gradient(135deg,#f87171,#dc2626) border-box;box-shadow:0 0 18px rgba(239,68,68,.6),0 6px 14px rgba(0,0,0,.35)}
+  .gpill{position:absolute;top:calc(100% + 8px);left:50%;transform:translateX(-50%);white-space:nowrap;padding:5px 13px;border-radius:999px;font-weight:800;font-size:12.5px;color:#111;background:#fff;box-shadow:0 3px 10px rgba(0,0,0,.3);letter-spacing:.2px}
   #errBox{position:absolute;left:16px;right:16px;top:36%;background:rgba(18,24,32,.95);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:16px;font-size:14.5px;line-height:1.55;display:none;z-index:9;text-align:center}
   .toast{position:fixed;left:50%;bottom:112px;transform:translateX(-50%);background:rgba(23,33,43,.96);border:1px solid rgba(255,255,255,.14);padding:10px 16px;border-radius:22px;font-size:14px;display:none;z-index:60;white-space:nowrap}
 </style>
@@ -99,32 +70,30 @@
 <!-- ================= CHAT ================= -->
 <div class="screen on" id="chatScreen">
   <svg class="wp" aria-hidden="true"><defs><pattern id="dp" width="300" height="300" patternUnits="userSpaceOnUse">
-    <g fill="none" stroke="rgba(56,189,248,0.5)" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round">
+    <g fill="none" stroke="rgba(255,255,255,0.05)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M40 30 l4 9 10 1 -7 7 2 10 -9 -5 -9 5 2 -10 -7 -7 10 -1 z"/>
       <path d="M120 44 c-4 -8 -20 -6 -20 3 c0 8 10 12 20 19 c10 -7 20 -11 20 -19 c0 -9 -16 -11 -20 -3z"/>
-      <path d="M196 40 l6 -12 8 10 8 -14 8 14 8 -10 6 12 z M196 48 h44"/>
-      <circle cx="60" cy="122" r="14"/><path d="M48 112 l-4 -10 10 5 M72 112 l4 -10 -10 5"/><circle cx="54" cy="119" r="1.8" fill="rgba(56,189,248,0.5)"/><circle cx="66" cy="119" r="1.8" fill="rgba(56,189,248,0.5)"/><path d="M54 129 q6 4 12 0 M40 124 h-6 M40 132 h-6 M80 124 h6 M80 132 h6"/>
-      <rect x="118" y="106" width="42" height="26" rx="12"/><path d="M128 114 v8 M124 118 h8"/><circle cx="148" cy="116" r="2" fill="rgba(56,189,248,0.5)"/><circle cx="153" cy="123" r="2" fill="rgba(56,189,248,0.5)"/>
-      <path d="M232 100 q14 4 12 20 l-8 14 -6 -10 -12 -2 8 -12 q2 -8 6 -10z"/><circle cx="230" cy="112" r="3.4"/><path d="M220 132 q-6 8 -2 14 M240 136 q8 4 8 12"/>
-      <path d="M36 196 q10 -14 24 -4 q14 -8 20 4 q-8 14 -22 12 q-16 0 -22 -12z"/>
-      <rect x="112" y="182" width="34" height="30" rx="3"/><path d="M112 194 h34 M129 182 v30"/><path d="M129 182 q-12 2 -12 -6 q0 -7 7 -6 q6 1 5 12z M129 182 q12 2 12 -6 q0 -7 -7 -6 q-6 1 -5 12z"/>
-      <path d="M212 182 a15 15 0 1 0 9 27 a11.5 11.5 0 1 1 -9 -27z"/>
-      <path d="M48 258 l20 -8 -8 20 -4 -8 z M56 250 l4 10"/>
-      <circle cx="132" cy="252" r="7"/><circle cx="132" cy="234" r="6"/><circle cx="118" cy="243" r="6"/><circle cx="146" cy="243" r="6"/><circle cx="124" cy="268" r="6"/><circle cx="140" cy="268" r="6"/>
-      <path d="M206 244 q16 -10 26 4 l2 12 -14 4 -4 10 -6 -12 -12 -4 z"/><path d="M214 262 q4 10 -2 16"/>
-      <path d="M262 176 l3 14 14 2 -10 9 3 14 -12 -7 -12 7 3 -14 -10 -9 14 -2 z"/>
+      <path d="M205 30 q14 -10 24 2 q12 -2 12 9 q0 10 -14 10 l-20 0 q-11 -1 -10 -10 q0 -9 8 -11z"/>
+      <circle cx="60" cy="120" r="14"/><circle cx="54" cy="116" r="2.4" fill="rgba(255,255,255,0.05)"/><circle cx="66" cy="116" r="2.4" fill="rgba(255,255,255,0.05)"/><path d="M52 128 q8 6 16 0"/>
+      <path d="M140 105 q16 14 34 4 q-6 16 -24 18 q-14 -8 -10 -22z"/><path d="M174 109 l12 -8 M174 109 l13 2"/>
+      <circle cx="240" cy="118" r="7"/><circle cx="240" cy="100" r="6"/><circle cx="226" cy="109" r="6"/><circle cx="254" cy="109" r="6"/><circle cx="232" cy="126" r="6"/><circle cx="248" cy="126" r="6"/>
+      <path d="M36 190 q10 -14 24 -4 q14 -8 20 4 q-8 14 -22 12 q-16 0 -22 -12z"/>
+      <path d="M120 185 l18 26 M138 185 l-18 26 M112 198 h34" />
+      <path d="M205 180 a16 16 0 1 0 10 29 a12 12 0 1 1 -10 -29z"/>
+      <path d="M52 262 l6 -16 6 16 M40 252 h48 M44 278 q20 8 40 0"/>
+      <path d="M128 250 q14 -6 22 6 q-8 10 -22 10 q-14 0 -22 -10 q8 -12 22 -6z"/><circle cx="120" cy="256" r="2.2" fill="rgba(255,255,255,0.05)"/>
+      <path d="M215 246 v26 M204 258 q11 8 22 0 M215 246 l-5 -8 M215 246 l6 -7"/>
+      <path d="M262 190 l4 20 -14 8 -2 -16 z M252 202 l-12 -4"/>
     </g></pattern></defs><rect width="100%" height="100%" fill="url(#dp)"/></svg>
 
   <div class="chat-head">
-    <button class="hbtn">&#8592;</button>
-    <div class="hpill"><div class="avw"><div class="av">&#128104;&#127997;</div><span class="avcrown">&#128081;</span></div><div style="min-width:0"><div class="nm">anandji <svg class="tick" viewBox="0 0 24 24" width="15" height="15"><circle cx="12" cy="12" r="10" fill="#2AABEE"/><path d="M8 12.5l2.6 2.6L16.4 9" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="st">last seen recently</div></div></div>
-    <button class="hbtn" id="callBtn" title="Video call"><svg viewBox="0 0 24 24" width="21" height="21"><path fill="#fff" d="M3 8.2A2.2 2.2 0 0 1 5.2 6h8.6A2.2 2.2 0 0 1 16 8.2v7.6a2.2 2.2 0 0 1-2.2 2.2H5.2A2.2 2.2 0 0 1 3 15.8V8.2z"/><path fill="#fff" d="M16 10.7l5-2.9v8.4l-5-2.9z"/></svg></button>
-    <button class="hbtn">&#8942;</button>
+    <button class="hbtn">←</button>
+    <div class="hpill"><div class="av">👨🏽</div><div style="min-width:0"><div class="nm">anandji</div><div class="st">last seen recently</div></div></div>
+    <div class="hpill2"><button id="callBtn" title="Video call">📹</button><button>⋮</button></div>
   </div>
 
   <div class="chat-body">
-    <div class="motif"><svg class="plane" viewBox="0 0 24 24" width="118" height="118"><path d="M22 2 11 13" stroke="#bae6fd" stroke-width="1.6"/><path d="M22 2 15 22l-4-9-9-4z" fill="rgba(56,189,248,.28)" stroke="#7dd3fc" stroke-width="1.6" stroke-linejoin="round"/></svg><div class="gw">GramWasi</div><div class="tag">Chat Better Together</div></div>
-    <div class="dchip">&#128197; November 24</div>
+    <div class="dchip">November 24</div>
     <div class="schip">anandji GramWasi par aaya 🎉</div>
     <div class="msg them">Bhai video call wala demo dekha?<span class="tm">7:02 PM</span></div>
     <div class="msg me">Haan, ab Telegram jaisa bana hai — wallpaper, button, sab<span class="tm">7:03 PM</span></div>
@@ -132,21 +101,12 @@
     <div class="msg me">Haan, wahi dabao 👍<span class="tm">7:04 PM</span></div>
   </div>
 
-  <div class="demo-note">🎬 <b>VIDEO CALL DEMO v6 — chhote glossy button + neon typing bar ✨</b> — upar 📹 dabao, camera <b>Allow</b> karna. Call screen par chamakdaar glass wale Flip / Stop Video / Mute / End Call button — bilkul tumhari bheji photo jaise. Chat ke andar ka pura hissa — neon header (taaj 👑 + blue tick), doodle wallpaper, badi plane wali design, neon theme — bilkul tumhari bheji photo jaisa hai. Typing bar bhi waisi hi hai: smiley par taaj 👑, beech me dil, bada neela mic. Call wale button ab chhote kar diye hain. Upar-left button se call chhoti (minimize) bhi hogi.</div>
+  <div class="demo-note">🎬 <b>VIDEO CALL DEMO v8 — chat normal, naye safed-ring wale call button ✨</b> — upar 📹 dabao, camera <b>Allow</b> karna. Chat jaisi thi waisi hi normal hai — koi lighting nahi. Call screen par tumhare naye safed gole + rangin ring wale chhote button hain — chaaro ek line me fit. Upar-left button se call chhoti (minimize) bhi hogi.</div>
 
-  <div class="chat-foot">
-    <span class="fh" style="left:16%;top:-14px">💜</span>
-    <span class="fh" style="left:56%;top:-16px;animation-delay:.7s">💙</span>
-    <span class="fh" style="right:12%;bottom:-13px;animation-delay:1.3s">💜</span>
-    <div class="bar"><div class="bar-in">
-      <button class="emo"><span class="crown">👑</span><svg viewBox="0 0 24 24" width="26" height="26"><circle cx="12" cy="12" r="9" fill="none" stroke="#fff" stroke-width="1.9"/><circle cx="9" cy="10" r="1.35" fill="#fff"/><circle cx="15" cy="10" r="1.35" fill="#fff"/><path d="M7.6 14.2a5.4 5.4 0 0 0 8.8 0" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round"/></svg></button>
-      <div class="vdiv"></div>
-      <div class="txt">Message</div>
-      <div class="hearts"><svg viewBox="0 0 24 24" width="27" height="27" style="left:0;top:2px"><path d="M12 20.5C6 16.5 3 13.3 3 9.6 3 6.9 5.1 5 7.6 5c1.7 0 3.4.9 4.4 2.4C13 5.9 14.7 5 16.4 5 18.9 5 21 6.9 21 9.6c0 3.7-3 6.9-9 10.9z" fill="none" stroke="#e879f9" stroke-width="1.8"/></svg><svg viewBox="0 0 24 24" width="22" height="22" style="right:0;bottom:0"><path d="M12 20.5C6 16.5 3 13.3 3 9.6 3 6.9 5.1 5 7.6 5c1.7 0 3.4.9 4.4 2.4C13 5.9 14.7 5 16.4 5 18.9 5 21 6.9 21 9.6c0 3.7-3 6.9-9 10.9z" fill="none" stroke="#22d3ee" stroke-width="1.9"/></svg></div>
-      <button class="att"><svg viewBox="0 0 24 24" width="23" height="23"><path d="M20.5 11.5l-8.3 8.3a5.3 5.3 0 0 1-7.5-7.5l8.7-8.7a3.55 3.55 0 0 1 5 5l-8.3 8.3a1.8 1.8 0 0 1-2.5-2.5l7.4-7.4" fill="none" stroke="#fff" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" transform="rotate(8 12 12)"/></svg></button>
-      <button class="nmic"><svg viewBox="0 0 24 24" width="27" height="27"><rect x="9" y="2.4" width="6" height="11" rx="3" fill="#fff"/><path d="M5.8 11.2a6.2 6.2 0 0 0 12.4 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17.6" x2="12" y2="20.4" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8.4" y1="20.8" x2="15.6" y2="20.8" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>
-    </div></div>
-  </div>
+  <div class="chat-foot"><div class="bar">
+    <button class="ic">😊</button><div class="txt">Message</div><button class="ic">📎</button><button class="mic">🎤</button>
+  </div></div>
+</div>
 
 <!-- ================= CALL ================= -->
 <div class="screen" id="callScreen">
@@ -160,10 +120,10 @@
   </div>
   <div id="errBox"></div>
   <div class="call-controls">
-    <div class="g-wrap"><button class="gbtn flip" id="flipBtn"><svg viewBox="0 0 24 24" width="29" height="29"><path fill="#fff" d="M8.2 6.4 9.6 4.2h4.8l1.4 2.2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.4a2 2 0 0 1 2-2h3.2z"/><path fill="none" stroke="#312e81" stroke-width="1.7" stroke-linecap="round" d="M8.5 13.3a3.6 3.6 0 0 1 6.3-1.9"/><path fill="#312e81" d="M15.7 8.5l.2 3.5-3.3-1.3z"/><path fill="none" stroke="#312e81" stroke-width="1.7" stroke-linecap="round" d="M15.5 15.1a3.6 3.6 0 0 1-6.3 1.9"/><path fill="#312e81" d="M8.3 19.9l-.2-3.5 3.3 1.3z"/></svg></button><div class="gpill f">✦ Flip ✦</div></div>
-    <div class="g-wrap"><button class="gbtn stopv" id="camBtn"><svg viewBox="0 0 24 24" width="29" height="29"><path fill="#fff" d="M3 8.2A2.2 2.2 0 0 1 5.2 6h8.6A2.2 2.2 0 0 1 16 8.2v7.6a2.2 2.2 0 0 1-2.2 2.2H5.2A2.2 2.2 0 0 1 3 15.8V8.2z"/><path fill="#fff" d="M16 10.7l5-2.9v8.4l-5-2.9z"/><line x1="4.6" y1="19.6" x2="19.4" y2="4.4" stroke="#ff5722" stroke-width="2.6" stroke-linecap="round"/></svg></button><div class="gpill s">✦ Stop Video ✦</div></div>
-    <div class="g-wrap"><button class="gbtn mute" id="muteBtn"><svg viewBox="0 0 24 24" width="28" height="28"><rect x="9" y="2.4" width="6" height="11" rx="3" fill="#fff"/><path d="M5.8 11.2a6.2 6.2 0 0 0 12.4 0" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17.6" x2="12" y2="20.4" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line x1="8.4" y1="20.8" x2="15.6" y2="20.8" stroke="#fff" stroke-width="2" stroke-linecap="round"/><line class="mic-slash" x1="4.6" y1="4.2" x2="19.4" y2="19.8" stroke="#fff" stroke-width="2.2" stroke-linecap="round" style="display:none"/></svg></button><div class="gpill m">✦ Mute ✦</div></div>
-    <div class="g-wrap"><button class="gbtn end" id="endBtn"><svg viewBox="0 0 24 24" width="32" height="32"><path fill="#fff" d="M12 9c-2.9 0-5.7.6-8.2 1.7-.5.3-.7 1-.4 1.6l1.3 2.7c.2.5.8.7 1.3.5 1.3-.7 2.7-1 4.1-1 .3 0 .7.2.9.5l1 1.7c.2.4.7.6 1.2.4 1.5-.5 3.1-.7 4.8-.7s3.3.2 4.8.7c.5.2 1 0 1.2-.4l1-1.7c.2-.3.6-.5.9-.5 1.4 0 2.8.3 4.1 1 .5.2 1.1 0 1.3-.5l1.3-2.7c.3-.6.1-1.3-.4-1.6C17.7 9.6 14.9 9 12 9z"/></svg></button><div class="gpill e">✦ End Call ✦</div></div>
+    <div class="g-wrap"><button class="gbtn flip" id="flipBtn"><svg viewBox="0 0 24 24" width="27" height="27"><path fill="#111" d="M8.2 6.4 9.6 4.2h4.8l1.4 2.2H19a2 2 0 0 1 2 2V18a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8.4a2 2 0 0 1 2-2h3.2z"/><path fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" d="M8.5 13.3a3.6 3.6 0 0 1 6.3-1.9"/><path fill="#fff" d="M15.7 8.5l.2 3.5-3.3-1.3z"/><path fill="none" stroke="#fff" stroke-width="1.7" stroke-linecap="round" d="M15.5 15.1a3.6 3.6 0 0 1-6.3 1.9"/><path fill="#fff" d="M8.3 19.9l-.2-3.5 3.3 1.3z"/></svg></button><div class="gpill">Flip</div></div>
+    <div class="g-wrap"><button class="gbtn stopv" id="camBtn"><svg viewBox="0 0 24 24" width="27" height="27"><path fill="#111" d="M3 8.2A2.2 2.2 0 0 1 5.2 6h8.6A2.2 2.2 0 0 1 16 8.2v7.6a2.2 2.2 0 0 1-2.2 2.2H5.2A2.2 2.2 0 0 1 3 15.8V8.2z"/><path fill="#111" d="M16 10.7l5-2.9v8.4l-5-2.9z"/></svg></button><div class="gpill">Stop Video</div></div>
+    <div class="g-wrap"><button class="gbtn mute" id="muteBtn"><svg viewBox="0 0 24 24" width="26" height="26"><rect x="9" y="2.4" width="6" height="11" rx="3" fill="#111"/><path d="M5.8 11.2a6.2 6.2 0 0 0 12.4 0" fill="none" stroke="#111" stroke-width="2" stroke-linecap="round"/><line x1="12" y1="17.6" x2="12" y2="20.4" stroke="#111" stroke-width="2" stroke-linecap="round"/><line x1="8.4" y1="20.8" x2="15.6" y2="20.8" stroke="#111" stroke-width="2" stroke-linecap="round"/><line x1="5" y1="4.5" x2="19" y2="19.5" stroke="#111" stroke-width="2.2" stroke-linecap="round"/></svg></button><div class="gpill">Mute</div></div>
+    <div class="g-wrap"><button class="gbtn end" id="endBtn"><svg viewBox="0 0 24 24" width="28" height="28"><path fill="#111" d="M12 9c-2.9 0-5.7.6-8.2 1.7-.5.3-.7 1-.4 1.6l1.3 2.7c.2.5.8.7 1.3.5 1.3-.7 2.7-1 4.1-1 .3 0 .7.2.9.5l1 1.7c.2.4.7.6 1.2.4 1.5-.5 3.1-.7 4.8-.7s3.3.2 4.8.7c.5.2 1 0 1.2-.4l1-1.7c.2-.3.6-.5.9-.5 1.4 0 2.8.3 4.1 1 .5.2 1.1 0 1.3-.5l1.3-2.7c.3-.6.1-1.3-.4-1.6C17.7 9.6 14.9 9 12 9z"/></svg></button><div class="gpill">End Call</div></div>
   </div>
 
 <div class="toast" id="toast"></div>
@@ -224,7 +184,6 @@ function endCall(){
   $("errBox").style.display="none";
   muted=false;camOff=false;
   $("muteBtn").classList.remove("off");$("camBtn").classList.remove("off");
-  var _sl=$("muteBtn").querySelector(".mic-slash");if(_sl)_sl.style.display="none";
   $("callScreen").classList.remove("on");$("callScreen").classList.remove("mini");
   if(dur>0){var m=Math.floor(dur/60),s=dur%60;toast("📞 Call khatm · "+m+":"+(s<10?"0":"")+s);}
 }
@@ -239,7 +198,6 @@ $("muteBtn").addEventListener("click",function(){
   muted=!muted;
   localStream.getAudioTracks().forEach(function(t){t.enabled=!muted;});
   this.classList.toggle("off",muted);
-  var sl=this.querySelector(".mic-slash");if(sl)sl.style.display=muted?"":"none";
 });
 $("camBtn").addEventListener("click",function(){
   if(!localStream)return;
