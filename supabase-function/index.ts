@@ -1388,9 +1388,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 30, min: 30,
+      return send(res, 200, { ok: true, latest: 31, min: 31,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 1.3 — Profile counts pakke, follow/post/reel/save sab fix. Update kar lo.' });
+        notes: 'Version 1.4 — Naya home design, Following/Reels tabs, YouTube Shorts.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
