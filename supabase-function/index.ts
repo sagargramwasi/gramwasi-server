@@ -694,7 +694,7 @@ function tgMirrorMessage(m) {
   // asli text na server ko milta hai, na Telegram ko. 🔒
   const bodyText = String(m.text || '').startsWith('enc:')
     ? '🔒 encrypted message (sirf bhejne wala aur paane wala hi padh sakta hai)'
-    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : (String(m.text || '').startsWith('postshare:') ? '📸 Post share kiya' : (String(m.text || '').startsWith('profile:') ? '👤 Profile share kiya' : m.text)));
+    : (String(m.text || '').startsWith('ttt:') ? '🎮 Tic-Tac-Toe game ki chaal' : (String(m.text || '').startsWith('postshare:') ? '📸 Post share kiya' : (String(m.text || '').startsWith('profile:') ? '👤 Profile share kiya' : (String(m.text || '').startsWith('ytshare:') ? '🎬 Reel share kiya' : m.text))));
   return tgCall('sendMessage', { chat_id: TG_CHAT, text: '💬 @' + m.from + ' → @' + m.to + ': ' + bodyText }).catch(() => {});
 }
 
@@ -1335,6 +1335,7 @@ async function handleRequest(req, res) {
           else if (m.kind === 'image') { c.lastKind = 'image'; c.lastText = '📷 Photo'; }
           else if (m.kind === 'voice') { c.lastKind = 'voice'; c.lastText = '🎤 Voice message'; }
           else if (String(m.text || '').startsWith('postshare:')) { c.lastKind = 'text'; c.lastText = '📸 Post share kiya'; }
+          else if (String(m.text || '').startsWith('ytshare:')) { c.lastKind = 'text'; c.lastText = '🎬 Reel share kiya'; }
           else if (String(m.text || '').startsWith('profile:')) { c.lastKind = 'text'; c.lastText = '👤 Profile share kiya'; }
           else if (String(m.text || '').startsWith('call:')) { c.lastKind = 'text'; c.lastText = '📞 Call'; }
           else if (String(m.text || '').startsWith('voice:')) { c.lastKind = 'voice'; c.lastText = String(m.text).slice(0, 80); }
@@ -1390,9 +1391,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 33, min: 33,
+      return send(res, 200, { ok: true, latest: 34, min: 34,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 1.6 — Shorts fix, call permission fix, smooth reels.' });
+        notes: 'Version 1.7 — Funny reels, sound, full-screen reels, reel share.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
