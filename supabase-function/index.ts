@@ -17,6 +17,7 @@ import * as __gwPath from "node:path";
 import * as __gwCrypto from "node:crypto";
 import * as __gwHttps from "node:https";
 import * as __gwTls from "node:tls";
+import * as __gwZlib from "node:zlib";
 import { Buffer as __gwBuffer } from "node:buffer";
 import { EventEmitter as __gwEventEmitter } from "node:events";
 
@@ -54,6 +55,7 @@ const __gwModules = {
   "crypto": __gwCrypto,
   "https": __gwHttps,
   "tls": __gwTls,
+  "zlib": __gwZlib,
 };
 const require = (id) => {
   if (Object.prototype.hasOwnProperty.call(__gwModules, id)) return __gwModules[id];
@@ -77,6 +79,7 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const zlib = require('zlib');
 
 const ADMIN_KEY = process.env.ADMIN_KEY || 'gramwasi-admin-123';
 const GW_OWNER = 'sagarjha'; // Owner account — sirf isko extra powers (rename/verify/delete)
@@ -112,7 +115,7 @@ function seedData() {
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
-    followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, lastSeen: 0, createdAt: Date.now()
+    followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, lastSeen: 0, note: '', noteAt: 0, createdAt: Date.now()
   });
   d.users.push(mk('demo', 'Demo User', true), mk('aarav_sharma', 'Aarav Sharma', true),
     mk('priya_singh', 'Priya Singh', false), mk('rohit_kumar', 'Rohit Kumar', false));
@@ -540,6 +543,8 @@ function pub(u) {
     verified: u.verified, blocked: u.blocked,
     lastSeen: typeof u.lastSeen === 'number' ? u.lastSeen : 0,
     crownUntil: typeof u.crownUntil === 'number' ? u.crownUntil : 0,
+    note: (u.note && (Date.now() - (u.noteAt || 0)) < 24 * 3600 * 1000) ? u.note : '',
+    noteAt: typeof u.noteAt === 'number' ? u.noteAt : 0,
     ownerPower: isOwnerUser(u),
     followers: (u.followers || []).length, following: (u.following || []).length,
     followerList: u.followers || [], followingList: u.following || [] };
@@ -560,11 +565,17 @@ function adminUser(u) {
 }
 
 function send(res, code, obj) {
-  const body = JSON.stringify(obj);
-  res.writeHead(code, { 'Content-Type': 'application/json',
+  let body = JSON.stringify(obj);
+  const headers = { 'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type, x-admin-key',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' });
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS' };
+  // Bade jawab (posts/users) gzip me — slow net par stream katne se bachav.
+  if (body.length > 4096 && res._ae && String(res._ae).indexOf('gzip') >= 0) {
+    try { body = zlib.gzipSync(body); headers['Content-Encoding'] = 'gzip'; headers['Vary'] = 'Accept-Encoding'; } catch (e) { body = JSON.stringify(obj); }
+  }
+  headers['Content-Length'] = Buffer.byteLength(body);
+  res.writeHead(code, headers);
   res.end(body);
 }
 function readBody(req) {
@@ -635,7 +646,8 @@ function tgUploadVideo(buffer, caption) {
     r.write(payload); r.end();
   });
 }
-function tgUploadVoice(buffer, caption) {
+function tgUploadVoice(buffer, caption, ext, mime) {
+  ext = ext || 'webm'; mime = mime || 'audio/webm';
   // Voice note upload: pehle sendVoice (OGG), fail ho to sendDocument (webm bhi chalega).
   function up(method, field, filename, ctype, pick) {
     return new Promise(resolve => {
@@ -654,8 +666,9 @@ function tgUploadVoice(buffer, caption) {
       r.write(payload); r.end();
     });
   }
-  return up('sendVoice', 'voice', 'voice.ogg', 'audio/ogg', j => j.result && j.result.voice && j.result.voice.file_id)
-    .then(id => id || up('sendDocument', 'document', 'voice.webm', 'audio/webm', j => j.result && j.result.document && j.result.document.file_id));
+  const doc = () => up('sendDocument', 'document', 'voice.' + ext, mime, j => j.result && j.result.document && j.result.document.file_id);
+  if (ext === 'ogg') return up('sendVoice', 'voice', 'voice.ogg', 'audio/ogg', j => j.result && j.result.voice && j.result.voice.file_id).then(id => id || doc());
+  return doc();
 }
 async function tgStorePostImage(post) {
   if (!TG_ON || !post.image) return;
@@ -685,6 +698,7 @@ function tgMirrorMessage(m) {
 }
 
 async function handleRequest(req, res) {
+  try { res._ae = (req.headers || {})['accept-encoding'] || ''; } catch (e) {}
   const url = new URL(req.url, 'http://x');
   const p = url.pathname;
   if (req.method === 'OPTIONS') { send(res, 200, {}); return; }
@@ -832,7 +846,7 @@ async function handleRequest(req, res) {
         emailVerified: true,
         avatar: 'https://picsum.photos/seed/' + username + '/150/150',
         passwordHash: pend.passwordHash, verified: false, blocked: false,
-        followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, lastSeen: 0, createdAt: Date.now() };
+        followers: [], following: [], acceptedChats: [], blockedUsers: [], chatCleared: {}, lastSeen: 0, note: '', noteAt: 0, createdAt: Date.now() };
       db.users.push(u);
       delete db.pending[username];
       await saveDb();
@@ -856,7 +870,8 @@ async function handleRequest(req, res) {
       // ye fields na ho to khali array).
       return send(res, 200, { user: pub(u),
         acceptedChats: Array.isArray(u.acceptedChats) ? u.acceptedChats : [],
-        blockedUsers: Array.isArray(u.blockedUsers) ? u.blockedUsers : [] });
+        blockedUsers: Array.isArray(u.blockedUsers) ? u.blockedUsers : [],
+        note: typeof u.note === 'string' ? u.note : '', noteAt: typeof u.noteAt === 'number' ? u.noteAt : 0 });
     }
     if (p === '/api/users' && req.method === 'GET') {
       return send(res, 200, { users: db.users.filter(u => !u.blocked).map(pub) });
@@ -878,6 +893,14 @@ async function handleRequest(req, res) {
       if (body.avatar !== undefined) u.avatar = body.avatar;
       await saveDb();
       return send(res, 200, { ok: true, user: pub(u) });
+    }
+    if (p === '/api/note' && req.method === 'POST') {
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      const nt = String(body.note || '').trim().slice(0, 60);
+      u.note = nt; u.noteAt = nt ? Date.now() : 0;
+      await saveDb();
+      return send(res, 200, { ok: true, note: u.note, noteAt: u.noteAt });
     }
     if (p === '/api/presence' && req.method === 'POST') {
       // Presence heartbeat: app khula hai to har kuch second me ping aata
@@ -1356,9 +1379,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 28, min: 25,
+      return send(res, 200, { ok: true, latest: 29, min: 25,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v28 — Profile naya Instagram style + followers count fix + unfollow asaan. Update kar lo.' });
+        notes: 'Version 1.2 — Notes, DM requests fix, voice pakka, chat menu asaan. Update kar lo.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
@@ -1412,7 +1435,9 @@ async function handleRequest(req, res) {
           const b64 = body.audio.split(',')[1] || '';
           const buf = Buffer.from(b64, 'base64');
           if (buf.length > 4 * 1024 * 1024) return send(res, 400, { error: 'voice note bahut lamba hai' });
-          const fid = await tgUploadVoice(buf, '💬 ' + from.username + ' → ' + to.username + ' (voice)');
+          const am = body.audio.match(/^data:([^;,]+)/); const amime = am ? am[1] : 'audio/webm';
+          const aext = amime.indexOf('mp4') >= 0 ? 'm4a' : (amime.indexOf('ogg') >= 0 ? 'ogg' : 'webm');
+          const fid = await tgUploadVoice(buf, '💬 ' + from.username + ' → ' + to.username + ' (voice)', aext, amime);
           m.kind = 'voice';
           m.audioDur = Math.max(0, Math.min(600, Number(body.audioDur) || 0));
           if (fid) m.telegramFileId = fid; else if (buf.length < 3 * 1024 * 1024) m.audioData = body.audio;
@@ -1508,7 +1533,6 @@ async function handleRequest(req, res) {
 }
 
 const server = http.createServer(handleRequest);
-
 // ============================================================================
 // ===== Fetch adapter: Supabase Edge Function <-> Node-style handleRequest ====
 // ============================================================================
