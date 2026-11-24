@@ -64,7 +64,7 @@ var ME=qs.get("me")||"", PEER=qs.get("peer")||"", PNAME=qs.get("name")||PEER,
     ROLE=(qs.get("role")==="callee")?"callee":"caller",
     CALLID=qs.get("callid")||"",
     SERVER=(qs.get("server")||"").replace(/\/+$/,"");
-var ICE_SERVERS=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"}];
+var ICE_SERVERS=[{urls:"stun:stun.l.google.com:19302"},{urls:"stun:stun1.l.google.com:19302"},{urls:"turn:openrelay.metered.ca:80",username:"openrelayproject",credential:"openrelayproject"},{urls:"turn:openrelay.metered.ca:443",username:"openrelayproject",credential:"openrelayproject"},{urls:"turns:openrelay.metered.ca:443?transport=tcp",username:"openrelayproject",credential:"openrelayproject"}];
 
 var pc=null, localStream=null, facing="user", vSender=null;
 var videoTrackOn=(MODE==="video"), muted=false, flipping=false;
