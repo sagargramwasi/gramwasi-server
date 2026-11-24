@@ -741,6 +741,15 @@ async function handleRequest(req, res) {
         const fp = j && j.result && j.result.file_path;
         if (fp) { res.writeHead(302, { Location: 'https://api.telegram.org/file/bot' + TG_TOKEN + '/' + fp }); res.end(); return; }
       }
+      // Telegram upload fail hua tha to message me fallback data-URL pada hai —
+      // wahi serve karo, warna voice/photo hamesha ke liye atak jata tha.
+      const mdu = mm && (mm.imageData || mm.audioData);
+      if (mdu) {
+        const mt = mdu.match(/^data:([^;,]+)/);
+        const mbuf = Buffer.from(mdu.split(',')[1] || '', 'base64');
+        res.writeHead(200, { 'Content-Type': mt ? mt[1] : 'application/octet-stream', 'Content-Length': mbuf.length, 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' });
+        res.end(mbuf); return;
+      }
       send(res, 404, { error: 'media nahi mila' }); return;
     }
     const post = db.posts.find(x => String(x.id) === String(wantId)) || (db.stories || []).find(x => String(x.id) === String(wantId));
