@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>GramWasi Video Call — Demo</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{background:#0d0d12;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;height:100dvh;overflow:hidden}
+  .screen{position:absolute;inset:0;display:none;flex-direction:column}
+  .screen.on{display:flex}
+  /* ---------- CHAT SCREEN ---------- */
+  #chatScreen{background:#0e1621}
+  .chat-head{display:flex;align-items:center;gap:10px;padding:10px 12px;background:#17212b}
+  .chat-head .av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#db2777);display:flex;align-items:center;justify-content:center;font-size:19px;flex:none}
+  .chat-head .nm{font-weight:700;font-size:16.5px}
+  .chat-head .st{font-size:12.5px;color:#4ade80}
+  .chat-head .callbtn{margin-left:auto;width:44px;height:44px;border-radius:50%;border:none;background:#7c3aed;color:#fff;font-size:20px;cursor:pointer;box-shadow:0 4px 14px rgba(124,58,237,.5)}
+  .chat-head .callbtn:active{transform:scale(.93)}
+  .chat-body{flex:1;padding:16px 12px;overflow-y:auto;display:flex;flex-direction:column;gap:8px}
+  .msg{max-width:75%;padding:9px 12px;border-radius:14px;font-size:15px;line-height:1.35}
+  .msg.them{background:#182533;align-self:flex-start;border-bottom-left-radius:4px}
+  .msg.me{background:linear-gradient(135deg,#3f9be0,#2b7cd3);align-self:flex-end;border-bottom-right-radius:4px}
+  .msg .tm{display:block;font-size:10.5px;opacity:.65;margin-top:3px;text-align:right}
+  .demo-note{margin:10px 12px;padding:11px 13px;background:rgba(124,58,237,.14);border:1px solid rgba(124,58,237,.45);border-radius:12px;font-size:13.5px;line-height:1.45}
+  .chat-foot{display:flex;gap:8px;padding:10px 12px;background:#17212b;align-items:center}
+  .chat-foot .pill{flex:1;background:#0e1621;border-radius:22px;padding:11px 14px;color:#8b98a5;font-size:14.5px}
+  .chat-foot .send{width:44px;height:44px;border-radius:50%;border:none;background:#7c3aed;color:#fff;font-size:18px;flex:none}
+  /* ---------- CALL SCREEN ---------- */
+  #callScreen{background:#000}
+  #remoteVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111}
+  #localVideo{position:absolute;right:14px;bottom:120px;width:104px;height:148px;object-fit:cover;border-radius:16px;border:2px solid rgba(255,255,255,.35);background:#222;z-index:5}
+  .call-top{position:absolute;top:0;left:0;right:0;padding:26px 16px 30px;text-align:center;background:linear-gradient(rgba(0,0,0,.55),transparent);z-index:6}
+  .call-top .cn{font-size:21px;font-weight:800;text-shadow:0 1px 6px rgba(0,0,0,.6)}
+  .call-top .cs{font-size:14px;color:#e5e7eb;margin-top:3px;text-shadow:0 1px 4px rgba(0,0,0,.6)}
+  .ring-av{width:104px;height:104px;border-radius:50%;background:linear-gradient(135deg,#7c3aed,#db2777);margin:12px auto 0;display:none;align-items:center;justify-content:center;font-size:44px;animation:pulse 1.4s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(124,58,237,.55)}100%{box-shadow:0 0 0 26px rgba(124,58,237,0)}}
+  .call-controls{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 30px;display:flex;justify-content:center;gap:16px;background:linear-gradient(transparent,rgba(0,0,0,.6));z-index:6}
+  .cc{width:58px;height:58px;border-radius:50%;border:none;background:rgba(255,255,255,.16);backdrop-filter:blur(6px);color:#fff;font-size:23px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .cc.off{background:#fff;color:#111}
+  .cc.end{background:#e11d48;width:66px;height:66px;font-size:26px;box-shadow:0 6px 18px rgba(225,29,72,.5)}
+  .cc:active{transform:scale(.93)}
+  .cc-lab{font-size:10.5px;text-align:center;color:#d1d5db;margin-top:5px}
+  .cc-wrap{display:flex;flex-direction:column;align-items:center}
+  #errBox{position:absolute;left:16px;right:16px;top:38%;background:rgba(20,20,28,.94);border:1px solid rgba(255,255,255,.15);border-radius:14px;padding:16px;font-size:14.5px;line-height:1.5;display:none;z-index:9;text-align:center}
+  .toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:rgba(24,24,32,.95);border:1px solid rgba(255,255,255,.14);padding:10px 16px;border-radius:22px;font-size:14px;display:none;z-index:20;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- ================= CHAT ================= -->
+<div class="screen on" id="chatScreen">
+  <div class="chat-head">
+    <div class="av">👨🏽</div>
+    <div><div class="nm">anandji</div><div class="st">online</div></div>
+    <button class="callbtn" id="callBtn" title="Video call">📹</button>
+  </div>
+  <div class="chat-body">
+    <div class="msg them">Bhai app me video call kab aayega?<span class="tm">7:02 PM</span></div>
+    <div class="msg me">Demo ban gaya hai, pehle check kar lo 👍<span class="tm">7:03 PM</span></div>
+    <div class="msg them">Upar 📹 wala button dabau?<span class="tm">7:03 PM</span></div>
+    <div class="msg me">Haan, wahi dabao — call ki screen khul jayegi<span class="tm">7:04 PM</span></div>
+  </div>
+  <div class="demo-note">🎬 <b>VIDEO CALL DEMO</b> — upar 📹 button dabao. Camera ki permission mangega, <b>Allow</b> kar dena. Demo me dusri taraf bhi tumhara hi camera dikhega (connection asal wala hai, banda demo hai) — asal app me dusra banda dikhega.</div>
+  <div class="chat-foot"><div class="pill">Message…</div><button class="send">➤</button></div>
+</div>
+
+<!-- ================= CALL ================= -->
+<div class="screen" id="callScreen">
+  <video id="remoteVideo" autoplay playsinline muted></video>
+  <video id="localVideo" autoplay playsinline muted></video>
+  <div class="call-top">
+    <div class="cn">anandji</div>
+    <div class="cs" id="callStatus">Calling… 📞</div>
+    <div class="ring-av" id="ringAv">👨🏽</div>
+  </div>
+  <div id="errBox"></div>
+  <div class="call-controls">
+    <div class="cc-wrap"><button class="cc" id="muteBtn">🎤</button><div class="cc-lab">Mute</div></div>
+    <div class="cc-wrap"><button class="cc" id="camBtn">📷</button><div class="cc-lab">Camera</div></div>
+    <div class="cc-wrap"><button class="cc" id="flipBtn">🔄</button><div class="cc-lab">Flip</div></div>
+    <div class="cc-wrap"><button class="cc end" id="endBtn">📞</button><div class="cc-lab">End</div></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+var $=function(id){return document.getElementById(id);};
+var localStream=null,pc1=null,pc2=null,callTimer=null,callSec=0,facing="user",muted=false,camOff=false;
+function toast(t){var e=$("toast");e.textContent=t;e.style.display="block";setTimeout(function(){e.style.display="none";},2600);}
+function show(id){document.querySelectorAll(".screen").forEach(function(x){x.classList.remove("on");});$(id).classList.add("on");}
+
+$("callBtn").addEventListener("click",startCall);
+
+async function startCall(){
+  show("callScreen");
+  $("callStatus").textContent="Calling… 📞";
+  $("ringAv").style.display="flex";
+  $("remoteVideo").style.display="none";
+  try{
+    localStream=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:true});
+  }catch(e){
+    var eb=$("errBox");eb.style.display="block";
+    eb.innerHTML="📷 <b>Camera/mic ki permission nahi mili.</b><br>Browser ke lock 🔒 wale nishan par tap karke Camera + Microphone <b>Allow</b> karo, phir page refresh karke dobara try karo.";
+    return;
+  }
+  $("localVideo").srcObject=localStream;
+  // Asal RTC connection (loopback): pc1 -> pc2, bilkul waisi hi pipeline
+  // jaisi asal app me server-signaling ke saath chalegi.
+  pc1=new RTCPeerConnection();pc2=new RTCPeerConnection();
+  pc1.onicecandidate=function(e){if(e.candidate)pc2.addIceCandidate(e.candidate).catch(function(){});};
+  pc2.onicecandidate=function(e){if(e.candidate)pc1.addIceCandidate(e.candidate).catch(function(){});};
+  pc2.ontrack=function(e){$("remoteVideo").srcObject=e.streams[0];};
+  localStream.getTracks().forEach(function(t){pc1.addTrack(t,localStream);});
+  setTimeout(async function(){
+    if(!pc1)return;
+    try{
+      var offer=await pc1.createOffer();await pc1.setLocalDescription(offer);await pc2.setRemoteDescription(offer);
+      var ans=await pc2.createAnswer();await pc2.setLocalDescription(ans);await pc1.setRemoteDescription(ans);
+    }catch(e){}
+    $("ringAv").style.display="none";
+    $("remoteVideo").style.display="";
+    callSec=0;$("callStatus").textContent="0:00";
+    callTimer=setInterval(function(){callSec++;var m=Math.floor(callSec/60),s=callSec%60;$("callStatus").textContent=m+":"+(s<10?"0":"")+s;},1000);
+  },2200);
+}
+
+function endCall(){
+  if(callTimer){clearInterval(callTimer);callTimer=null;}
+  var dur=callSec;callSec=0;
+  try{if(pc1)pc1.close();if(pc2)pc2.close();}catch(e){}
+  pc1=pc2=null;
+  if(localStream){localStream.getTracks().forEach(function(t){t.stop();});localStream=null;}
+  $("localVideo").srcObject=null;$("remoteVideo").srcObject=null;
+  $("errBox").style.display="none";
+  muted=false;camOff=false;$("muteBtn").classList.remove("off");$("camBtn").classList.remove("off");
+  $("muteBtn").textContent="🎤";$("camBtn").textContent="📷";
+  show("chatScreen");
+  if(dur>0){var m=Math.floor(dur/60),s=dur%60;toast("📞 Call khatm · "+m+":"+(s<10?"0":"")+s);}
+}
+
+$("endBtn").addEventListener("click",endCall);
+$("muteBtn").addEventListener("click",function(){
+  if(!localStream)return;
+  muted=!muted;
+  localStream.getAudioTracks().forEach(function(t){t.enabled=!muted;});
+  this.classList.toggle("off",muted);this.textContent=muted?"🔇":"🎤";
+});
+$("camBtn").addEventListener("click",function(){
+  if(!localStream)return;
+  camOff=!camOff;
+  localStream.getVideoTracks().forEach(function(t){t.enabled=!camOff;});
+  this.classList.toggle("off",camOff);this.textContent=camOff?"🚫":"📷";
+});
+$("flipBtn").addEventListener("click",async function(){
+  if(!localStream)return;
+  facing=(facing==="user")?"environment":"user";
+  try{
+    var ns=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false});
+    var nt=ns.getVideoTracks()[0];
+    var old=localStream.getVideoTracks()[0];
+    localStream.removeTrack(old);old.stop();localStream.addTrack(nt);
+    var sender=pc1?pc1.getSenders().find(function(x){return x.track&&x.track.kind==="video";}):null;
+    if(sender)await sender.replaceTrack(nt);
+    $("localVideo").srcObject=localStream;
+  }catch(e){toast("Camera flip nahi hua");}
+});
+</script>
+</body>
+</html>
