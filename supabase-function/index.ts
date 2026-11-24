@@ -80,6 +80,7 @@ const crypto = require('crypto');
 
 const ADMIN_KEY = process.env.ADMIN_KEY || 'gramwasi-admin-123';
 const GW_OWNER = 'sagarjha'; // Owner account — sirf isko extra powers (rename/verify/delete)
+function isOwnerUser(u) { return !!u && (u.username === GW_OWNER || (db.owners || []).indexOf(u.username) >= 0); }
 const DATA_FILE = process.env.GRAMWASI_DATA_FILE || (process.env.VERCEL || process.env.NETLIFY ? '/tmp/gramwasi-data.json' : path.join(__dirname, 'data.json'));
 
 // ---------- Storage ----------
@@ -97,7 +98,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
-let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
+let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], seq: 1 };
 let dbReady = false;   // pehli load koshish ho chuki hai
 let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
 let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
@@ -107,7 +108,7 @@ let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
 let dbLoadOk = false;  // Supabase se ASAL data load hua hai — jab tak false, ye instance save NAHI karega (blind instance kabhi asli data overwrite nahi kar sakta)
 
 function seedData() {
-  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], seq: 1 };
+  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], seq: 1 };
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
@@ -247,6 +248,7 @@ function normalizeDb(d) {
     if (typeof d.seq === 'number' && d.seq > 0) out.seq = d.seq;
     if (d.pending && typeof d.pending === 'object') out.pending = d.pending;
     if (d.wpSeededV15 === true) out.wpSeededV15 = true;
+    if (Array.isArray(d.owners)) out.owners = d.owners;
     if (typeof d.tgOffset === 'number') out.tgOffset = d.tgOffset;
     if (typeof d.tgLastCheck === 'number') out.tgLastCheck = d.tgLastCheck;
   }
@@ -527,6 +529,7 @@ function pub(u) {
     verified: u.verified, blocked: u.blocked,
     lastSeen: typeof u.lastSeen === 'number' ? u.lastSeen : 0,
     crownUntil: typeof u.crownUntil === 'number' ? u.crownUntil : 0,
+    ownerPower: isOwnerUser(u),
     followers: (u.followers || []).length, following: (u.following || []).length,
     followerList: u.followers || [], followingList: u.following || [] };
 }
@@ -536,7 +539,7 @@ function byName(name) { return db.users.find(u => u.username === String(name || 
 function adminUser(u) {
   return { username: u.username, name: u.name, bio: u.bio || '', avatar: u.avatar,
     email: u.email || '', emailVerified: !!u.emailVerified,
-    verified: !!u.verified, blocked: !!u.blocked,
+    verified: !!u.verified, blocked: !!u.blocked, ownerPower: isOwnerUser(u),
     followers: (u.followers || []).length, following: (u.following || []).length,
     followerList: u.followers || [], followingList: u.following || [],
     postCount: db.posts.filter(x => x.username === u.username).length,
@@ -880,7 +883,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/owner/rename' && req.method === 'POST') {
       const by = byName(body.by);
-      if (!by || by.username !== GW_OWNER) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
+      if (!isOwnerUser(by)) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
       const t = byName(body.target);
       const nm = String(body.name || '').trim().slice(0, 40);
       if (!t || !nm) return send(res, 400, { error: 'target ya naam galat hai' });
@@ -889,7 +892,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/owner/verify' && req.method === 'POST') {
       const by = byName(body.by);
-      if (!by || by.username !== GW_OWNER) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
+      if (!isOwnerUser(by)) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
       const t = byName(body.target);
       if (!t) return send(res, 404, { error: 'user nahi mila' });
       t.verified = !!body.verified; await saveDb();
@@ -897,7 +900,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/owner/delete-post' && req.method === 'POST') {
       const by = byName(body.by);
-      if (!by || by.username !== GW_OWNER) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
+      if (!isOwnerUser(by)) return send(res, 403, { error: 'ye power sirf owner account ke paas hai' });
       const idx = db.posts.findIndex(x => String(x.id) === String(body.postId));
       if (idx < 0) return send(res, 404, { error: 'post nahi mila' });
       db.posts.splice(idx, 1); await saveDb();
@@ -956,6 +959,45 @@ async function handleRequest(req, res) {
       else { story.likes.push(u.username); liked = true; }
       await saveDb();
       return send(res, 200, { ok: true, liked, likes: story.likes.length });
+    }
+    if (p === '/api/admin/set-owner' && req.method === 'POST') {
+      if (!isAdmin) return send(res, 401, { error: 'admin key chahiye' });
+      const t = byName(body.username);
+      if (!t) return send(res, 404, { error: 'user nahi mila' });
+      db.owners = db.owners || [];
+      const has = db.owners.indexOf(t.username) >= 0;
+      if (body.owner && !has) db.owners.push(t.username);
+      if (!body.owner && has) db.owners = db.owners.filter(x => x !== t.username);
+      await saveDb();
+      return send(res, 200, { ok: true, ownerPower: isOwnerUser(t) });
+    }
+    if (p === '/api/chat/delete-message' && req.method === 'POST') {
+      const idx = db.messages.findIndex(m => m.id === Number(body.messageId));
+      if (idx < 0) return send(res, 404, { error: 'message nahi mila' });
+      if (db.messages[idx].from !== String(body.from || '') && !isOwnerUser(byName(body.from))) return send(res, 403, { error: 'sirf apna message delete hoga' });
+      db.messages.splice(idx, 1); await saveDb();
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/chat/edit-message' && req.method === 'POST') {
+      const m = db.messages.find(x => x.id === Number(body.messageId));
+      if (!m) return send(res, 404, { error: 'message nahi mila' });
+      if (m.from !== String(body.from || '')) return send(res, 403, { error: 'sirf apna message edit hoga' });
+      const nt = String(body.text || '').trim().slice(0, 1000);
+      if (!nt || nt.indexOf('ttt:') === 0 || m.text.indexOf('ttt:') === 0) return send(res, 400, { error: 'ye message edit nahi hoga' });
+      m.text = nt; m.edited = true; await saveDb();
+      return send(res, 200, { ok: true });
+    }
+    if (p === '/api/chat/react' && req.method === 'POST') {
+      // Message reaction SIRF owner/official account ke liye hai.
+      const by = byName(body.by);
+      if (!isOwnerUser(by)) return send(res, 403, { error: 'reaction ki power sirf official account ke paas hai' });
+      const m = db.messages.find(x => x.id === Number(body.messageId));
+      if (!m) return send(res, 404, { error: 'message nahi mila' });
+      const em = String(body.emoji || '');
+      if (em && ['❤️','😂','👍','😮','🔥'].indexOf(em) < 0) return send(res, 400, { error: 'emoji allowed nahi' });
+      if (em) { m.reaction = em; m.reactionBy = by.username; } else { delete m.reaction; delete m.reactionBy; }
+      await saveDb();
+      return send(res, 200, { ok: true, reaction: m.reaction || '' });
     }
     if (p === '/api/crown' && req.method === 'POST') {
       // Game series jeetne par Taj: user par 10 minute ke liye crown.
@@ -1250,9 +1292,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 21, min: 21,
+      return send(res, 200, { ok: true, latest: 22, min: 22,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v21 — Back button fix, game ka ek hi panel + fire KING, bhagwan photos fix, Telegram photo seedha app me, owner powers. Update karke hi app chalega.' });
+        notes: 'v22 — Message delete/edit, official reaction, panel se owner power. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
