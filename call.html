@@ -71,7 +71,7 @@ var videoTrackOn=(MODE==="video"), muted=false, flipping=false;
 var remoteDescSet=false, iceQueue=[], lastSigId=0, seenSigs={};
 var pollTimer=null, timerInt=null, callSec=0, connected=false, ended=false;
 var ringTimeout=null, dotTimer=null;
-var camFailed=false, permShown=false;
+var camFailed=false, permShown=false, busyShown=false;
 
 $("peerName").textContent=PNAME;
 $("avatarName").textContent=PNAME;
@@ -140,27 +140,77 @@ function refreshPreview(){
 function videoCons(face){
   return {facingMode:face,width:{ideal:640},height:{ideal:480},frameRate:{max:30}};
 }
-async function getMedia(){
-  if(MODE==="audio"){
-    try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
-    catch(e){ showPermError(e); throw e; }
+/* ---- Media acquisition: single-flight + retry ladder ----
+   NotReadableError/AbortError ka matlab permission NAHI hai — camera/mic
+   busy hai ya start fail hua (aksar page reload ke turant baad purana
+   stream band hone se pehle naya maangne par). Isi liye:
+   - ek samay par ek hi acquisition (single-flight promise)
+   - har koshish se pehle purana localStream poora band
+   - busy par SAME constraints 700ms ruk kar retry (kul 3), phir saada
+     {video:true} (2), phir sirf audio (2) */
+var mediaPromise=null;
+function delayMs(ms){return new Promise(function(r){setTimeout(r,ms);});}
+function stopLocalTracks(){
+  if(localStream){localStream.getTracks().forEach(function(t){try{t.stop();}catch(e){}});localStream=null;}
+  vSender=null;
+}
+async function gumRetry(cons,tries){
+  var lastErr=null;
+  for(var i=0;i<tries;i++){
+    try{ return await navigator.mediaDevices.getUserMedia(cons); }
+    catch(e){
+      lastErr=e;
+      if(e&&e.name==="NotAllowedError")throw e;
+      if(i<tries-1)await delayMs(700);
+    }
   }
-  try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:videoCons(facing)}); }
+  throw lastErr;
+}
+async function acquireMedia(){
+  stopLocalTracks();
+  if(MODE==="audio")return gumRetry({audio:true,video:false},3);
+  try{ return await gumRetry({audio:true,video:videoCons(facing)},3); }
   catch(e){
-    if(e&&e.name==="NotAllowedError"){ showPermError(e); throw e; }
-    // Camera kisi aur wajah se atak gaya (busy/overconstrained/notfound):
-    // ek baar bilkul saada constraints se, phir sirf awaaz se koshish.
-    try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:true}); }
+    if(e&&e.name==="NotAllowedError")throw e;
+    try{ return await gumRetry({audio:true,video:true},2); }
     catch(e2){
-      if(e2&&e2.name==="NotAllowedError"){ showPermError(e2); throw e2; }
-      var s;
-      try{ s=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
-      catch(e3){ showPermError(e3); throw e3; }
+      if(e2&&e2.name==="NotAllowedError")throw e2;
+      var s=await gumRetry({audio:true,video:false},2);
       camFailed=true;
       return s;
     }
   }
 }
+function getMedia(){
+  if(mediaPromise)return mediaPromise;
+  mediaPromise=(async function(){
+    try{ return await acquireMedia(); }
+    finally{ mediaPromise=null; }
+  })();
+  return mediaPromise;
+}
+/* Error box ka text asal error se match kare: sirf NotAllowedError hi
+   permission wala dabba dikhaye; busy/start-fail par busy wala dabba. */
+function showMediaError(err){
+  if(err&&err.name==="NotAllowedError")showPermError(err);
+  else showBusyError(err);
+}
+function showBusyError(err){
+  busyShown=true;
+  stopDots();setStatus("Camera/mic busy hai");
+  var eb=$("errBox");eb.style.display="block";
+  var nm=(err&&err.name)?('<span class="errname">Error: '+err.name+'</span>'):"";
+  eb.innerHTML="📷 <b>Camera/mic abhi busy hai.</b><br>Camera ya mic kisi aur app me use ho raha hai. Dusre camera wale app (Camera, WhatsApp, Instagram) band karke dobara try karo."+nm+"<br><button onclick=\"gwRetryMedia()\" class=\"alt\">Dobara try karo</button><button onclick=\"endCall(false)\">Band karo</button>";
+}
+/* Error box / CallActivity se: bina page reload kiye poori koshish dobara */
+function gwRetryMedia(){
+  var eb=$("errBox");eb.style.display="none";
+  permShown=false;busyShown=false;ended=false;camFailed=false;
+  document.body.classList.remove("nocam");
+  if(ROLE==="caller")startCaller();else startCallee();
+}
+window.gwRetryMedia=gwRetryMedia;
+window.__gwRetryMedia=gwRetryMedia;
 function applyCamFailed(){
   document.body.classList.add("nocam");
   videoTrackOn=false;
@@ -247,7 +297,7 @@ async function startCaller(){
   startDots("Ringing");
   sendSignal({t:"ring",mode:MODE});
   try{ localStream=await getMedia(); }
-  catch(e){ sendSignal({t:"bye"}); if(!permShown)showPermError(e); return; }
+  catch(e){ sendSignal({t:"bye"}); if(!permShown&&!busyShown)showMediaError(e); return; }
   if(camFailed)applyCamFailed();
   refreshPreview();
   makePc();
@@ -265,7 +315,7 @@ async function startCaller(){
 async function startCallee(){
   setStatus("Connecting…");
   try{ localStream=await getMedia(); }
-  catch(e){ sendSignal({t:"bye"}); if(!permShown)showPermError(e); return; }
+  catch(e){ sendSignal({t:"bye"}); if(!permShown&&!busyShown)showMediaError(e); return; }
   if(camFailed)applyCamFailed();
   refreshPreview();
   makePc();
