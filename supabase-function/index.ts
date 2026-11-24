@@ -1293,9 +1293,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 23, min: 23,
+      return send(res, 200, { ok: true, latest: 24, min: 24,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'v23 — Followers fix, Chat Lock (PIN), saaf-suthra app. Update karke hi app chalega.' });
+        notes: 'v24 — Bhagwan photos + saari posts ab feed aur search me dikhengi. Update karke hi app chalega.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
