@@ -7,7 +7,7 @@
 <style>
   *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
   body{background:#000;color:#fff;font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;height:100dvh;overflow:hidden}
-  #remoteVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111}
+  #remoteVideo{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#111;visibility:hidden}
   #localVideo{position:absolute;right:14px;top:86px;width:104px;height:148px;border-radius:16px;border:2px solid rgba(255,255,255,.35);background:#1c2733;object-fit:cover;z-index:5}
   .avatarBig{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:14px;background:radial-gradient(circle at 50% 35%,#24384c,#0e1621);z-index:4}
   .avatarBig .circ{width:118px;height:118px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#2563eb);display:flex;align-items:center;justify-content:center;font-size:52px;font-weight:800;color:#fff;box-shadow:0 12px 34px rgba(0,0,0,.5)}
@@ -32,6 +32,11 @@
   body.audio #remoteVideo,body.audio #localVideo{display:none}
   body.audio .g-wrap.audiocam{display:none}
   body.audio .avatarBig{display:flex}
+  body.nocam #localVideo{display:none}
+  body.nocam .g-wrap.audiocam{display:none}
+  body.nocam .avatarBig{display:flex}
+  #errBox .errname{display:block;margin-top:8px;font-size:11.5px;color:#9fb3c8}
+  #errBox button.alt{background:#2b7cd3;margin-left:8px}
 </style>
 </head>
 <body>
@@ -66,6 +71,7 @@ var videoTrackOn=(MODE==="video"), muted=false, flipping=false;
 var remoteDescSet=false, iceQueue=[], lastSigId=0, seenSigs={};
 var pollTimer=null, timerInt=null, callSec=0, connected=false, ended=false;
 var ringTimeout=null, dotTimer=null;
+var camFailed=false, permShown=false;
 
 $("peerName").textContent=PNAME;
 $("avatarName").textContent=PNAME;
@@ -131,24 +137,55 @@ function refreshPreview(){
   var vt=liveVideoTrack(); if(vt)tracks.push(vt);
   $("localVideo").srcObject=new MediaStream(tracks);
 }
-async function getMedia(){
-  var cons=(MODE==="audio")?{audio:true,video:false}
-                           :{audio:true,video:{facingMode:facing}};
-  return navigator.mediaDevices.getUserMedia(cons);
+function videoCons(face){
+  return {facingMode:face,width:{ideal:640},height:{ideal:480},frameRate:{max:30}};
 }
-function showPermError(){
+async function getMedia(){
+  if(MODE==="audio"){
+    try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
+    catch(e){ showPermError(e); throw e; }
+  }
+  try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:videoCons(facing)}); }
+  catch(e){
+    if(e&&e.name==="NotAllowedError"){ showPermError(e); throw e; }
+    // Camera kisi aur wajah se atak gaya (busy/overconstrained/notfound):
+    // ek baar bilkul saada constraints se, phir sirf awaaz se koshish.
+    try{ return await navigator.mediaDevices.getUserMedia({audio:true,video:true}); }
+    catch(e2){
+      if(e2&&e2.name==="NotAllowedError"){ showPermError(e2); throw e2; }
+      var s;
+      try{ s=await navigator.mediaDevices.getUserMedia({audio:true,video:false}); }
+      catch(e3){ showPermError(e3); throw e3; }
+      camFailed=true;
+      return s;
+    }
+  }
+}
+function applyCamFailed(){
+  document.body.classList.add("nocam");
+  videoTrackOn=false;
+  toast("Camera nahi mila — voice call chal raha hai");
+}
+function showPermError(err){
+  permShown=true;
   stopDots();setStatus("Permission nahi mili");
   var eb=$("errBox");eb.style.display="block";
-  eb.innerHTML="📷 <b>Camera/mic ki permission nahi mili.</b><br>Phone ki Settings me GramWasi app ko Camera + Microphone <b>Allow</b> karo, phir dobara call karo.<br><button onclick=\"endCall(false)\">Band karo</button>";
+  var nm=(err&&err.name)?('<span class="errname">Error: '+err.name+'</span>'):"";
+  eb.innerHTML="📷 <b>Camera/mic ki permission nahi mili.</b><br>Phone ki Settings me GramWasi app ko Camera + Microphone <b>Allow</b> karo, phir dobara call karo."+nm+"<br><button onclick=\"gwReqPerms()\" class=\"alt\">Permission dobara maango</button><button onclick=\"endCall(false)\">Band karo</button>";
 }
+function gwReqPerms(){
+  try{ if(window.CallHost&&CallHost.requestPerms){ CallHost.requestPerms(); return; } }catch(e){}
+  toast("Settings me jaakar permission Allow karo");
+}
+window.gwReqPerms=gwReqPerms;
 
 /* ---------------- peer connection ---------------- */
 function makePc(){
   pc=new RTCPeerConnection({iceServers:ICE_SERVERS});
   pc.onicecandidate=function(e){ if(e.candidate)sendSignal({t:"ice",cand:e.candidate}); };
   pc.ontrack=function(e){
-    if(e.streams&&e.streams[0])$("remoteVideo").srcObject=e.streams[0];
-    if(MODE==="video")$("avatarBig").style.display="none";
+    if(e.streams&&e.streams[0]){ $("remoteVideo").srcObject=e.streams[0]; $("remoteVideo").style.visibility="visible"; }
+    if(MODE==="video"&&!camFailed)$("avatarBig").style.display="none";
   };
   pc.onconnectionstatechange=function(){
     if(!pc)return;
@@ -210,7 +247,8 @@ async function startCaller(){
   startDots("Ringing");
   sendSignal({t:"ring",mode:MODE});
   try{ localStream=await getMedia(); }
-  catch(e){ sendSignal({t:"bye"}); showPermError(); return; }
+  catch(e){ sendSignal({t:"bye"}); if(!permShown)showPermError(e); return; }
+  if(camFailed)applyCamFailed();
   refreshPreview();
   makePc();
   addLocalTracks();
@@ -227,7 +265,8 @@ async function startCaller(){
 async function startCallee(){
   setStatus("Connecting…");
   try{ localStream=await getMedia(); }
-  catch(e){ sendSignal({t:"bye"}); showPermError(); return; }
+  catch(e){ sendSignal({t:"bye"}); if(!permShown)showPermError(e); return; }
+  if(camFailed)applyCamFailed();
   refreshPreview();
   makePc();
   addLocalTracks();
@@ -277,7 +316,7 @@ $("flipBtn").addEventListener("click",async function(){
   if(!videoTrackOn||!liveVideoTrack()){ facing=target; toast("Camera badal gaya"); return; }
   flipping=true;
   var ns=null;
-  try{ ns=await navigator.mediaDevices.getUserMedia({video:{facingMode:target},audio:false}); }
+  try{ ns=await navigator.mediaDevices.getUserMedia({video:videoCons(target),audio:false}); }
   catch(e){ flipping=false; toast("Camera flip nahi hua"); return; }
   var nt=ns.getVideoTracks()[0];
   var old=liveVideoTrack();
@@ -314,7 +353,7 @@ $("camBtn").addEventListener("click",async function(){
     toast("Video band");
   }else{
     try{
-      var ns=await navigator.mediaDevices.getUserMedia({video:{facingMode:facing},audio:false});
+      var ns=await navigator.mediaDevices.getUserMedia({video:videoCons(facing),audio:false});
       var nt=ns.getVideoTracks()[0];
       localStream.addTrack(nt);
       var s2=videoSender();
@@ -329,7 +368,8 @@ $("camBtn").addEventListener("click",async function(){
 });
 
 /* ---------------- boot ---------------- */
-if(!ME||!PEER||!CALLID||!SERVER){ showPermError(); setStatus("Call link adhoora hai"); }
+if(MODE==="video")$("avatarBig").style.display="flex";
+if(!ME||!PEER||!CALLID||!SERVER){ setStatus("Call link adhoora hai"); var eb2=$("errBox"); eb2.style.display="block"; eb2.innerHTML="⚠️ <b>Call link adhoora hai.</b><br>App se dobara call karo.<br><button onclick=\"endCall(false)\">Band karo</button>"; }
 else if(ROLE==="caller"){ startCaller(); }
 else{ startCallee(); }
 </script>
