@@ -19,7 +19,12 @@
    v2.2 (sv=5): loop ke liye playlist param HATA diya — playlist mode me
    player apne beech wale prev/pause/next button aur title row khud
    dikhata tha (app ke play/pause calls par bhi). Ab loop player API se
-   hota hai: video khatm (onStateChange state 0) -> seekTo(0)+playVideo. */
+   hota hai: video khatm (onStateChange state 0) -> seekTo(0)+playVideo.
+   v2.3 (sv=6): player events parent (app) ko bhi forward hote hain —
+   app har player ka state track karke play/pause sirf zaroorat par
+   bhejta hai (faltu state-change se YouTube ka beech wala play/pause
+   nishan chamakta tha). Quality hd1080 ki koshish: ready par aur
+   pehle PLAYING state par ek baar. */
 var qs=new URLSearchParams(location.search);
 var v=qs.get("v")||"";
 var ap=(qs.get("autoplay")==="1")?"1":"0";
@@ -37,6 +42,7 @@ if(/^[A-Za-z0-9_-]{6,20}$/.test(v)){
   f.addEventListener("load",function(){
     // Player ke events (onStateChange) sunne ke liye listening handshake.
     try{ if(f.contentWindow)f.contentWindow.postMessage(JSON.stringify({event:"listening",id:"gw",channel:"widget"}),"https://www.youtube.com"); }catch(err){}
+    ytCmd("setPlaybackQuality",["hd1080"]);
   });
   window.addEventListener("message",function(e){
     if(e.source===window.parent){
@@ -44,11 +50,16 @@ if(/^[A-Za-z0-9_-]{6,20}$/.test(v)){
       return;
     }
     if(e.source===f.contentWindow){
+      // Player ke events app ko bhi bhejo — app state track karta hai.
+      try{ window.parent.postMessage(e.data,"*"); }catch(err){}
       try{
         var d=(typeof e.data==="string")?JSON.parse(e.data):e.data;
         var ended=(d&&d.event==="onStateChange"&&d.data===0)||
                   (d&&d.event==="infoDelivery"&&d.info&&d.info.playerState===0);
         if(ended){ ytCmd("seekTo",[0,true]); ytCmd("playVideo"); }
+        var playing=(d&&d.event==="onStateChange"&&d.data===1)||
+                    (d&&d.event==="infoDelivery"&&d.info&&d.info.playerState===1);
+        if(playing&&!window._gwQ){window._gwQ=1;ytCmd("setPlaybackQuality",["hd1080"]);}
       }catch(err){}
     }
   });
