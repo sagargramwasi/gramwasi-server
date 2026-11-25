@@ -1539,9 +1539,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 39, min: 39,
+      return send(res, 200, { ok: true, latest: 40, min: 40,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 2.2 — Feed me hi reel autoplay.' });
+        notes: 'Version 2.3 — Reel bilkul saaf, 10 reel pehle se taiyaar.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
