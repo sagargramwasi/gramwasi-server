@@ -260,6 +260,7 @@ function normalizeDb(d) {
   // ho to username hi name maan lo (app har user ka name dikhata hai).
   out.users.forEach(u => { if (u && typeof u === 'object' && !u.name) u.name = u.username; });
   out.posts.forEach(migratePost);
+  out.messages.forEach(foldLegacyReaction);
   ensureSeedReels(out);
   return out;
 }
@@ -280,6 +281,24 @@ function migratePost(post) {
   return post;
 }
 function postLikesCount(post) { migratePost(post); return (post.baseLikes || 0) + post.likedBy.length; }
+// v2.0: Message reactions ab PER-USER map me rehti hain — m.reactions =
+// { username: emoji }. v22 tak reaction sirf owner de sakta tha aur wo
+// m.reaction / m.reactionBy (single) me store hota tha; purane messages ki
+// wo reaction gayab na ho, isliye use map me fold kar dete hain (reactor =
+// reactionBy, na ho to owner). Load (normalizeDb), react handler aur rename
+// cascade — teeno jagah yahi fold chalta hai.
+function foldLegacyReaction(m) {
+  if (!m || typeof m !== 'object' || !m.reaction) return;
+  if (!m.reactions || typeof m.reactions !== 'object' || Array.isArray(m.reactions)) m.reactions = {};
+  const by = m.reactionBy || GW_OWNER;
+  if (!m.reactions[by]) m.reactions[by] = m.reaction;
+  delete m.reaction; delete m.reactionBy;
+}
+function msgReactions(m) {
+  foldLegacyReaction(m);
+  if (!m.reactions || typeof m.reactions !== 'object' || Array.isArray(m.reactions)) m.reactions = {};
+  return m.reactions;
+}
 // Telegram group (Rovenox) me Sagar jo photo dalta hai, wo GramWasi feed me
 // apne aap aa jaye — getUpdates se (bot ke apne messages skip). 20s throttle.
 let tgBotId = null;
@@ -592,7 +611,13 @@ function cascadeUsernameRename(oldUn, newUn) {
     (post.comments || []).forEach(c => { if (c && c.username === oldUn) c.username = newUn; if (c && c.user === oldUn) c.user = newUn; });
   });
   (db.stories || []).forEach(st => { if (st.username === oldUn) st.username = newUn; swap(st.views); swap(st.likes); });
-  (db.messages || []).forEach(m => { if (m.from === oldUn) m.from = newUn; if (m.to === oldUn) m.to = newUn; });
+  (db.messages || []).forEach(m => {
+    if (m.from === oldUn) m.from = newUn; if (m.to === oldUn) m.to = newUn;
+    if (m.reactionBy === oldUn) m.reactionBy = newUn;
+    if (m.reactions && typeof m.reactions === 'object' && Object.prototype.hasOwnProperty.call(m.reactions, oldUn)) {
+      m.reactions[newUn] = m.reactions[oldUn]; delete m.reactions[oldUn];
+    }
+  });
   (db.notifications || []).forEach(n => { if (n.user === oldUn) n.user = newUn; if (n.from === oldUn) n.from = newUn; });
   (db.reports || []).forEach(r => { if (r.by === oldUn) r.by = newUn; if (r.postUser === oldUn) r.postUser = newUn; });
   swap(db.owners);
@@ -1172,16 +1197,24 @@ async function handleRequest(req, res) {
       return send(res, 200, { ok: true });
     }
     if (p === '/api/chat/react' && req.method === 'POST') {
-      // Message reaction SIRF owner/official account ke liye hai.
+      // v2.0: Message reaction ab SABKE liye hai — lekin sirf wahi user react
+      // kar sakta hai jo is conversation ka hissa hai (message usne bheja ho
+      // ya use aaya ho). Reaction per-user map me rehti hai; wahi emoji
+      // dobara bhejne par apni reaction hat jati hai (toggle), dusri emoji
+      // bhejne par badal jati hai, aur emoji:"" bhi hatane ka tareeka hai.
       const by = byName(body.by);
-      if (!isOwnerUser(by)) return send(res, 403, { error: 'reaction ki power sirf official account ke paas hai' });
+      if (!by) return send(res, 404, { error: 'user nahi mila' });
       const m = db.messages.find(x => x.id === Number(body.messageId));
       if (!m) return send(res, 404, { error: 'message nahi mila' });
+      if (m.from !== by.username && m.to !== by.username) return send(res, 403, { error: 'is chat me reaction nahi de sakte' });
       const em = String(body.emoji || '');
       if (em && ['❤️','😂','👍','😮','🔥'].indexOf(em) < 0) return send(res, 400, { error: 'emoji allowed nahi' });
-      if (em) { m.reaction = em; m.reactionBy = by.username; } else { delete m.reaction; delete m.reactionBy; }
+      const rx = msgReactions(m);
+      if (!em || rx[by.username] === em) delete rx[by.username];
+      else rx[by.username] = em;
+      if (Object.keys(rx).length) m.reactions = rx; else delete m.reactions;
       await saveDb();
-      return send(res, 200, { ok: true, reaction: m.reaction || '' });
+      return send(res, 200, { ok: true, reactions: m.reactions || {} });
     }
     if (p === '/api/crown' && req.method === 'POST') {
       // Game series jeetne par Taj: user par 10 minute ke liye crown.
@@ -1482,9 +1515,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 36, min: 36,
+      return send(res, 200, { ok: true, latest: 37, min: 37,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 1.9 — Fresh funny reels, saaf share card.' });
+        notes: 'Version 2.0 — Reactions sabke liye.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
