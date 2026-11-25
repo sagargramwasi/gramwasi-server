@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="hi">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>GramWasi — Reels Demo</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:#f4f4f6;color:#111;height:100dvh;overflow:hidden}
+  /* ---------- MOCK HOME ---------- */
+  #homeScreen{position:absolute;inset:0;display:flex;flex-direction:column;background:#f4f4f6}
+  .gw-head{padding:14px 16px 6px;display:flex;align-items:center;gap:8px}
+  .gw-logo{font-size:26px;font-weight:800;letter-spacing:-.5px}
+  .gw-logo b{color:#111}.gw-logo span{color:#7c3aed}
+  .gw-logo i{font-style:normal;background:#7c3aed;color:#fff;font-size:10px;font-weight:700;border-radius:6px;padding:2px 6px;margin-left:8px;vertical-align:middle}
+  .gw-underline{height:3px;width:118px;border-radius:3px;background:linear-gradient(90deg,#7c3aed,#e879f9);margin:2px 16px 10px}
+  .gw-tabs{margin:0 16px;background:#e9e9ee;border-radius:999px;display:flex;padding:4px}
+  .gw-tabs button{flex:1;border:none;background:transparent;padding:8px 0;border-radius:999px;font-size:15px;font-weight:600;color:#444;cursor:pointer}
+  .gw-tabs button.on{background:#fff;color:#7c3aed;box-shadow:0 1px 5px rgba(0,0,0,.12)}
+  .gw-scroll{flex:1;overflow-y:auto;padding:12px 14px 110px}
+  .gw-stories{display:flex;gap:14px;padding:2px 2px 12px;overflow-x:auto}
+  .gw-story{display:flex;flex-direction:column;align-items:center;gap:5px;font-size:12px;color:#333;flex:none}
+  .gw-story .ring{width:62px;height:62px;border-radius:50%;padding:3px;background:conic-gradient(from 210deg,#f59e0b,#ef4444,#7c3aed,#f59e0b)}
+  .gw-story .ring div{width:100%;height:100%;border-radius:50%;border:2.5px solid #f4f4f6;display:flex;align-items:center;justify-content:center;font-size:22px;color:#fff;font-weight:700}
+  .gw-card{background:#fff;border-radius:22px;padding:12px;margin-bottom:16px;box-shadow:0 2px 12px rgba(0,0,0,.06)}
+  .gw-card .hd{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+  .gw-card .hd .av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#2563eb);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700}
+  .gw-card .hd b{font-size:14.5px}.gw-card .hd small{display:block;color:#888;font-size:12px}
+  .gw-card .ph{height:230px;border-radius:14px;display:flex;align-items:center;justify-content:center;font-size:44px}
+  .gw-card .acts{display:flex;gap:16px;font-size:19px;padding:9px 2px 3px;color:#333}
+  .gw-card .cap{font-size:13.5px;color:#333;padding:2px}
+  .gw-nav{position:absolute;left:14px;right:14px;bottom:14px;background:#fff;border-radius:999px;box-shadow:0 8px 28px rgba(0,0,0,.16);display:flex;align-items:center;justify-content:space-around;padding:9px 6px}
+  .gw-nav button{border:none;background:transparent;font-size:21px;cursor:pointer;color:#333;width:44px;height:44px;border-radius:50%}
+  .gw-nav .plus{background:linear-gradient(135deg,#8b5cf6,#7c3aed);color:#fff;font-size:24px;box-shadow:0 6px 16px rgba(124,58,237,.45)}
+  /* ---------- REELS PLAYER ---------- */
+  #reelScreen{position:absolute;inset:0;background:#000;display:none;z-index:20}
+  #reelScreen.open{display:block}
+  #reelWrap{height:100%;overflow-y:auto;scroll-snap-type:y mandatory;overscroll-behavior:contain;scrollbar-width:none}
+  #reelWrap::-webkit-scrollbar{display:none}
+  .slide{position:relative;height:100%;scroll-snap-align:start;scroll-snap-stop:always;background:#000;overflow:hidden}
+  .yt-holder{position:absolute;inset:0}
+  .yt-holder iframe{width:100%;height:100%;border:0;display:block}
+  .yt-topfade{position:absolute;top:0;left:0;right:0;height:84px;background:linear-gradient(180deg,rgba(0,0,0,.88),rgba(0,0,0,0));pointer-events:none;z-index:3}
+  .yt-botfade{position:absolute;bottom:0;right:0;width:46%;height:120px;background:linear-gradient(315deg,rgba(0,0,0,.75),rgba(0,0,0,0) 70%);pointer-events:none;z-index:3}
+  .yt-botfadeL{position:absolute;bottom:0;left:0;right:0;height:110px;background:linear-gradient(0deg,rgba(0,0,0,.55),rgba(0,0,0,0));pointer-events:none;z-index:2}
+  .chip{position:absolute;top:52px;left:12px;z-index:5;background:rgba(20,20,28,.55);color:#fff;font-size:12.5px;font-weight:600;padding:5px 11px;border-radius:999px;backdrop-filter:blur(4px)}
+  .caption{position:absolute;left:12px;bottom:26px;right:86px;z-index:5;color:#fff;font-size:14.5px;font-weight:600;text-shadow:0 1px 5px rgba(0,0,0,.7);line-height:1.35}
+  .caption small{display:block;font-weight:400;font-size:12.5px;opacity:.85;margin-top:3px}
+  .rail{position:absolute;right:10px;bottom:88px;z-index:6;display:flex;flex-direction:column;gap:16px;align-items:center}
+  .rail button{width:46px;height:46px;border-radius:50%;border:none;background:rgba(25,25,34,.55);backdrop-filter:blur(4px);cursor:pointer;display:flex;align-items:center;justify-content:center}
+  .rail button svg{width:25px;height:25px;fill:#fff}
+  .rail button.liked svg{fill:#ff2e63}
+  .playflash{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%) scale(.8);z-index:7;width:74px;height:74px;border-radius:50%;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .18s,transform .18s}
+  .playflash.show{opacity:1;transform:translate(-50%,-50%) scale(1)}
+  .playflash svg{width:34px;height:34px;fill:#fff}
+  #reelsBack{position:absolute;top:12px;left:10px;z-index:10;width:38px;height:38px;border-radius:50%;border:none;background:rgba(20,20,28,.5);color:#fff;font-size:24px;line-height:1;cursor:pointer;backdrop-filter:blur(4px)}
+  #reelCount{position:absolute;top:18px;right:14px;z-index:10;color:rgba(255,255,255,.85);font-size:12.5px;background:rgba(20,20,28,.5);padding:4px 10px;border-radius:999px;backdrop-filter:blur(4px)}
+  /* share sheet + toast */
+  #shareSheet{position:absolute;left:0;right:0;bottom:0;z-index:40;background:#17171f;border-radius:20px 20px 0 0;padding:16px 16px 26px;transform:translateY(110%);transition:transform .25s ease;color:#fff}
+  #shareSheet.open{transform:none}
+  #shareSheet h3{font-size:15.5px;margin-bottom:12px}
+  .sh-row{display:flex;align-items:center;gap:12px;padding:9px 2px;cursor:pointer}
+  .sh-row .av{width:42px;height:42px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#2563eb);display:flex;align-items:center;justify-content:center;font-weight:700}
+  .sh-row small{display:block;color:#9a9aad;font-size:12px}
+  .sh-row .send{margin-left:auto;background:#7c3aed;color:#fff;border:none;border-radius:999px;padding:7px 16px;font-weight:700;cursor:pointer}
+  #shade{position:absolute;inset:0;background:rgba(0,0,0,.45);z-index:35;display:none}
+  #toast{position:absolute;left:50%;bottom:120px;transform:translateX(-50%);background:rgba(23,33,43,.96);color:#fff;padding:10px 18px;border-radius:22px;font-size:14px;display:none;z-index:60;white-space:nowrap}
+</style>
+</head>
+<body>
+
+<!-- ================= MOCK HOME ================= -->
+<div id="homeScreen">
+  <div class="gw-head"><div class="gw-logo"><b>Gram</b><span>Wasi</span><i>DEMO</i></div></div>
+  <div class="gw-underline"></div>
+  <div class="gw-tabs">
+    <button class="on">Feed</button><button>Following</button><button id="tabReels">Reels</button>
+  </div>
+  <div class="gw-scroll">
+    <div class="gw-stories">
+      <div class="gw-story"><div class="ring"><div style="background:#5b7a99">S</div></div>sagarjha</div>
+      <div class="gw-story"><div class="ring"><div style="background:#7a5b99">A</div></div>anandji</div>
+      <div class="gw-story"><div class="ring"><div style="background:#995b7a">A</div></div>aditya</div>
+      <div class="gw-story"><div class="ring"><div style="background:#5b997a">R</div></div>rohit</div>
+    </div>
+    <div class="gw-card">
+      <div class="hd"><div class="av">S</div><div><b>sagarjha</b><small>1 d ago</small></div></div>
+      <div class="ph" style="background:linear-gradient(160deg,#2b3a55,#7c3aed)">🛕</div>
+      <div class="acts"><span>❤️</span><span>💬</span><span>📤</span></div>
+      <div class="cap"><b>sagarjha</b> Demo home hai — upar <b>Reels</b> tab dabao 👆</div>
+    </div>
+    <div class="gw-card">
+      <div class="hd"><div class="av" style="background:linear-gradient(135deg,#f59e0b,#ef4444)">A</div><div><b>anandji</b><small>3 h ago</small></div></div>
+      <div class="ph" style="background:linear-gradient(160deg,#134e4a,#f59e0b)">🌅</div>
+      <div class="acts"><span>❤️</span><span>💬</span><span>📤</span></div>
+      <div class="cap"><b>anandji</b> Reels me back dabane par pehle yahi home aayega, phir app band hoga</div>
+    </div>
+  </div>
+  <div class="gw-nav">
+    <button>🏠</button><button>🔍</button><button class="plus">＋</button><button id="navReels">▶️</button><button>👤</button>
+  </div>
+</div>
+
+<!-- ================= REELS ================= -->
+<div id="reelScreen">
+  <div id="reelWrap"></div>
+  <button id="reelsBack" aria-label="Back">‹</button>
+  <div id="reelCount"></div>
+</div>
+
+<div id="shade"></div>
+<div id="shareSheet">
+  <h3>Reel bhejo — card bankar jayegi, link nahi</h3>
+  <div id="shareRows"></div>
+</div>
+<div id="toast"></div>
+
+<script>
+var SHORTS=[
+ {id:"TdODRzuewEg",t:"Naaptol comedy 😂"},{id:"YyYhc6JylOI",t:"Fauji comedy 😂"},
+ {id:"_bbJob_kypc",t:"Gobar se chabi 😂"},{id:"0rPH5evzCws",t:"Pujari aur sharabi 😂"},
+ {id:"5DHM3F7kNP4",t:"Sabzi chor Bimla Tai 😂"},{id:"6oWEVOg_Md4",t:"Amma pani-puri twist 😂"},
+ {id:"Fwdxx5hDcAc",t:"Jija-Sali joota churai 😂"},{id:"NehgXkfYMAQ",t:"Guruji comedy 😂"},
+ {id:"C1TQWVe-1rw",t:"Indian mom vs kan khjura 😂"},{id:"FBwB8xAwQpY",t:"Baby gobar meme 😂"},
+ {id:"7RelGbI9ONY",t:"Indian problem, Indian solution 😂"},{id:"JpTiMTdWUbw",t:"Gaon me 10 baje brush 😂"},
+ {id:"rHfyUBXTWeo",t:"Train emergency chain jugaad 😂"},{id:"uaqUnEPgQOg",t:"Single boys wedding meme 😂"},
+ {id:"9NLTxj--3F4",t:"Sheru Bhai aur Yamraj 😂"},{id:"L2c2UfPAGh0",t:"Mahapapi Snake vs Yamraj 😂"},
+ {id:"TAREr1ZRoao",t:"Try not to laugh — desi 😂"},{id:"RWOmpCb6R3w",t:"Delivery wala phone 😂"},
+ {id:"BTk-1n6DXmU",t:"Pani-puri twist 😂"},{id:"ri5Pd_YJCFc",t:"Petrol pump — 1 liter insaan 😂"},
+ {id:"y5-SACuAPj4",t:"Kutta-billi helpline 😂"},{id:"J---aiyznGQ",t:"Keyboard bajane wali billi 😂"},
+ {id:"nGeKSiCQkPw",t:"Bolne wala kutta 😂"},{id:"B8ISzf2pryI",t:"Guilty dog 😂"}
+];
+var WRAP="https://sagargramwasi.github.io/gramwasi-server/shorts.html";
+var seenKey="gw_demo_seen", soundKey="gw_demo_sound";
+function getSeen(){try{return JSON.parse(localStorage.getItem(seenKey)||"[]");}catch(e){return[];}}
+function setSeen(a){try{localStorage.setItem(seenKey,JSON.stringify(a));}catch(e){}}
+function soundOn(){try{return localStorage.getItem(soundKey)==="1";}catch(e){return false;}}
+function shuffle(a){for(var i=a.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var t=a[i];a[i]=a[j];a[j]=t;}return a;}
+function buildOrder(){
+  var seen=getSeen(), unseen=[], old=[];
+  SHORTS.forEach(function(v){ (seen.indexOf(v.id)>=0?old:unseen).push(v); });
+  if(!unseen.length){ setSeen([]); return shuffle(SHORTS.slice()); }
+  return shuffle(unseen);
+}
+var order=buildOrder(), activeIdx=-1, liked={}, playingState={};
+var wrap=document.getElementById("reelWrap");
+function toast(t){var e=document.getElementById("toast");e.textContent=t;e.style.display="block";setTimeout(function(){e.style.display="none";},2300);}
+function ytCmd(iframe,func,args){
+  if(!iframe||!iframe.contentWindow)return;
+  var msg=JSON.stringify({event:"command",func:func,args:args||""});
+  try{iframe.contentWindow.postMessage(msg,"*");}catch(e){}
+}
+function iframeSrc(v){ return WRAP+"?sv=4&v="+v.id+"&mute="+(soundOn()?"0":"1"); }
+function ensureIframe(i){
+  var s=order[i]; if(!s)return;
+  var slide=wrap.children[i]; if(!slide)return;
+  var holder=slide.querySelector(".yt-holder");
+  var f=holder.querySelector("iframe");
+  if(!f){
+    f=document.createElement("iframe");
+    f.setAttribute("allow","autoplay; encrypted-media; picture-in-picture");
+    f.setAttribute("allowfullscreen","");
+    f.setAttribute("referrerpolicy","strict-origin-when-cross-origin");
+    f.src=iframeSrc(s);
+    holder.appendChild(f);
+  }
+}
+function dropIframe(i){
+  var slide=wrap.children[i]; if(!slide)return;
+  var holder=slide.querySelector(".yt-holder");
+  var f=holder.querySelector("iframe");
+  if(f){ ytCmd(f,"pauseVideo"); holder.removeChild(f); }
+}
+function renderSlides(){
+  wrap.innerHTML="";
+  order.forEach(function(v,i){
+    var d=document.createElement("div"); d.className="slide"; d.dataset.idx=i;
+    d.innerHTML='<div class="yt-holder"></div><div class="yt-topfade"></div><div class="yt-botfadeL"></div><div class="yt-botfade"></div>'
+      +'<div class="chip">▶ Shorts</div>'
+      +'<div class="caption">'+v.t+'<small>@gramwasi · sirf funny 😂</small></div>'
+      +'<div class="rail">'
+      +'<button class="r-like" aria-label="Like"><svg viewBox="0 0 24 24"><path d="M12 21s-7.5-4.9-10-9.3C.4 8.6 2.2 5 5.7 5c2 0 3.4 1.1 4.3 2.4h4C15 6.1 16.4 5 18.4 5c3.5 0 5.3 3.6 3.6 6.7C19.5 16.1 12 21 12 21z" transform="scale(0.92) translate(1,0)"/></svg></button>'
+      +'<button class="r-share" aria-label="Share"><svg viewBox="0 0 24 24"><path d="M21.9 2.1l-3.1 18.6c-.2 1.2-1.5 1.7-2.5 1l-4.9-3.4-2.4 2.3c-.7.7-1.9.4-2.2-.5l-.8-3.4L18.6 6c.4-.3-.1-.8-.6-.5L3.9 12.2 2.6 11.1C1.6 10.3 2 8.6 3.2 8.2L20.4 1.6c.9-.3 1.7.4 1.5 1.3z" transform="scale(0.94) translate(0.7,0.7)"/></svg></button>'
+      +'<button class="r-snd" aria-label="Sound"><svg viewBox="0 0 24 24"><path d="M3 9v6h4l5 5V4L7 9H3z"/><path class="snd-waves" d="M16 8.8a4.5 4.5 0 010 6.4M18.4 6a8 8 0 010 12" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg></button>'
+      +'</div>'
+      +'<div class="playflash"><svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg></div>';
+    wrap.appendChild(d);
+    d.querySelector(".r-like").addEventListener("click",function(ev){
+      ev.stopPropagation();
+      liked[v.id]=!liked[v.id];
+      this.classList.toggle("liked",!!liked[v.id]);
+      toast(liked[v.id]?"❤️ Like ho gaya":"Like hat gaya");
+    });
+    d.querySelector(".r-share").addEventListener("click",function(ev){ ev.stopPropagation(); openShare(v); });
+    d.querySelector(".r-snd").addEventListener("click",function(ev){ ev.stopPropagation(); toggleSound(); });
+    d.addEventListener("click",function(){ togglePlay(i); });
+  });
+  updateSndIcons();
+}
+function slideIframe(i){ var s=wrap.children[i]; if(!s)return null; return s.querySelector("iframe"); }
+function flash(i,play){
+  var s=wrap.children[i]; if(!s)return;
+  var f=s.querySelector(".playflash");
+  f.innerHTML= play? '<svg viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>'
+                   : '<svg viewBox="0 0 24 24"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg>';
+  f.classList.add("show"); setTimeout(function(){f.classList.remove("show");},550);
+}
+function togglePlay(i){
+  if(i!==activeIdx)return;
+  var f=slideIframe(i); if(!f)return;
+  if(playingState[i]){ ytCmd(f,"pauseVideo"); playingState[i]=false; flash(i,false); }
+  else{ ytCmd(f,"playVideo"); playingState[i]=true; flash(i,true); }
+}
+function toggleSound(){
+  var on=!soundOn();
+  try{localStorage.setItem(soundKey,on?"1":"0");}catch(e){}
+  var f=slideIframe(activeIdx);
+  if(f){ if(on){ ytCmd(f,"unMute"); ytCmd(f,"setVolume",[100]); } else { ytCmd(f,"mute"); } }
+  updateSndIcons();
+  toast(on?"🔊 Awaaz ON":"🔇 Awaaz band");
+}
+function updateSndIcons(){
+  var on=soundOn();
+  var btns=document.querySelectorAll(".r-snd");
+  btns.forEach(function(b){ b.style.opacity= on? "1":"0.55"; });
+}
+var io=new IntersectionObserver(function(entries){
+  entries.forEach(function(en){
+    var i=+en.target.dataset.idx;
+    if(en.intersectionRatio>=0.6){ activate(i); }
+    else{
+      var f=slideIframe(i);
+      if(f&&i!==activeIdx){ ytCmd(f,"pauseVideo"); playingState[i]=false; }
+    }
+  });
+},{root:wrap,threshold:[0,0.6]});
+function activate(i){
+  if(i===activeIdx)return;
+  var prev=activeIdx; activeIdx=i;
+  if(prev>=0){ var pf=slideIframe(prev); if(pf){ ytCmd(pf,"pauseVideo"); playingState[prev]=false; } }
+  // agle 4 + pichle 2 pehle se load; usse door wale hatao (buffering nahi hoga)
+  for(var k=i-2;k<=i+4;k++){ if(k>=0&&k<order.length) ensureIframe(k); }
+  for(var m=0;m<order.length;m++){ if(m<i-2||m>i+4) dropIframe(m); }
+  var f=slideIframe(i);
+  if(f){ ytCmd(f,"playVideo"); if(soundOn()){ ytCmd(f,"unMute"); ytCmd(f,"setVolume",[100]); } }
+  playingState[i]=true;
+  var v=order[i];
+  if(v){ var s=getSeen(); if(s.indexOf(v.id)<0){ s.push(v.id); setSeen(s); } }
+  document.getElementById("reelCount").textContent=(i+1)+" / "+order.length;
+}
+function observeSlides(){ for(var i=0;i<wrap.children.length;i++) io.observe(wrap.children[i]); }
+/* ---------- share sheet ---------- */
+var shareFor=null;
+function openShare(v){
+  shareFor=v;
+  var users=[["anandji","A"],["aditya","A"],["aditya raj","A"],["rohit","R"]];
+  var box=document.getElementById("shareRows"); box.innerHTML="";
+  users.forEach(function(u){
+    var r=document.createElement("div"); r.className="sh-row";
+    r.innerHTML='<div class="av">'+u[1]+'</div><div><b>'+u[0]+'</b><small>@'+u[0].replace(/ /g,"")+'</small></div><button class="send">Bhejo</button>';
+    r.querySelector(".send").addEventListener("click",function(){
+      closeShare(); toast("🎬 Reel "+u[0]+" ko card bankar gayi (demo)");
+    });
+    box.appendChild(r);
+  });
+  document.getElementById("shade").style.display="block";
+  document.getElementById("shareSheet").classList.add("open");
+}
+function closeShare(){
+  document.getElementById("shade").style.display="none";
+  document.getElementById("shareSheet").classList.remove("open");
+}
+document.getElementById("shade").addEventListener("click",closeShare);
+/* ---------- open / close reels ---------- */
+var reelScreen=document.getElementById("reelScreen");
+function openReels(){
+  order=buildOrder();
+  renderSlides(); observeSlides();
+  reelScreen.classList.add("open");
+  wrap.scrollTop=0; activeIdx=-1;
+  ensureIframe(0); setTimeout(function(){ activate(0); },60);
+  try{history.pushState({reels:1},"");}catch(e){}
+  toast("▶ Reel chalu — swipe karo");
+}
+function closeReels(){
+  for(var i=0;i<order.length;i++) dropIframe(i);
+  activeIdx=-1;
+  reelScreen.classList.remove("open");
+  closeShare();
+}
+document.getElementById("tabReels").addEventListener("click",openReels);
+document.getElementById("navReels").addEventListener("click",openReels);
+document.getElementById("reelsBack").addEventListener("click",function(){
+  if(history.state&&history.state.reels){ history.back(); } else { closeReels(); }
+});
+window.addEventListener("popstate",function(){
+  if(reelScreen.classList.contains("open")) closeReels();
+});
+renderSlides();
+</script>
+</body>
+</html>
