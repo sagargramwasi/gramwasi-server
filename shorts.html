@@ -22,7 +22,7 @@ var ap=(qs.get("autoplay")==="1")?"1":"0";
 var mu=(qs.get("mute")==="0")?"0":"1";
 if(/^[A-Za-z0-9_-]{6,20}$/.test(v)){
   var f=document.createElement("iframe");
-  f.src="https://www.youtube.com/embed/"+v+"?enablejsapi=1&autoplay="+ap+"&mute="+mu+"&loop=1&playlist="+v+"&playsinline=1&rel=0&modestbranding=1&controls=0&origin=https://sagargramwasi.github.io";
+  f.src="https://www.youtube.com/embed/"+v+"?enablejsapi=1&autoplay="+ap+"&mute="+mu+"&loop=1&playlist="+v+"&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&controls=0&origin=https://sagargramwasi.github.io";
   f.setAttribute("allow","autoplay; encrypted-media; picture-in-picture");
   f.setAttribute("allowfullscreen","");
   f.setAttribute("title","YouTube Shorts");
