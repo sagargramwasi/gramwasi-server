@@ -307,13 +307,26 @@ async function maybeImportTgPhotos() {
     if (changed || list.length) await saveDb();
   } catch (e) { /* Telegram fail ho to feed normal chalti rahegi */ }
 }
-function serializePost(post) {
+function serializePost(post, slim) {
   migratePost(post);
   const pun = post.username || post.user || '';
   const out = { ...post, username: pun, likes: (post.baseLikes || 0) + post.likedBy.length,
     likedBy: post.likedBy.slice(), user: pun, author: pub(byName(pun)) };
   if (post.tgKind === 'video' && post.telegramFileId) out.video = '/api/media?postId=' + post.id;
   else if (!out.image && post.telegramFileId) out.image = '/api/media?postId=' + post.id;
+  if (slim) {
+    // LIST payload halka rakho (v1.9): inline data-URL media (photo ho ya
+    // video) list me KABHI mat bhejo — wahi media /api/media?postId= se
+    // serve hota hai. Stored record bilkul nahi badalta aur single-post
+    // response bhi nahi; sirf list wala rasta slim hai. Ek hi 700KB+ ki
+    // data-URL slow net par poori list response katwa deti thi — profile
+    // par 0/0/0 + khali grid ki bachi hui jad yahi thi (live par sirf ek
+    // post ki image hi ~766KB thi, baaki saari list ~30KB).
+    const isData = (s) => typeof s === 'string' && s.indexOf('data:') === 0;
+    if (isData(out.image)) out.image = '/api/media?postId=' + post.id;
+    if (isData(out.video)) out.video = '/api/media?postId=' + post.id;
+    if (isData(out.src)) out.src = '/api/media?postId=' + post.id;
+  }
   return out;
 }
 // Seeded popular reels: Reels tab khali na lage isliye Google ke sample bucket
@@ -790,6 +803,18 @@ async function handleRequest(req, res) {
     }
     const post = db.posts.find(x => String(x.id) === String(wantId)) || (db.stories || []).find(x => String(x.id) === String(wantId));
     if (!post) { send(res, 404, { error: 'post nahi mila' }); return; }
+    // Stored image khud ek data-URL hai (Telegram copy nahi bani thi) —
+    // bytes decode karke seedha serve karo. 302 redirect data: URL par
+    // WebView me kaam nahi karta, aur v1.9 se list payload media ko yahi
+    // se mangta hai, isliye ye rasta pakka chalna chahiye.
+    if (post.image && post.image.indexOf('data:') === 0) {
+      const mt = post.image.match(/^data:([^;,]+)/);
+      const dbuf = Buffer.from(post.image.split(',')[1] || '', 'base64');
+      if (dbuf.length) {
+        res.writeHead(200, { 'Content-Type': mt ? mt[1] : 'application/octet-stream', 'Content-Length': dbuf.length, 'Cache-Control': 'public, max-age=3600', 'Access-Control-Allow-Origin': '*' });
+        res.end(dbuf); return;
+      }
+    }
     if (post.image) { res.writeHead(302, { Location: post.image }); res.end(); return; }
     if (post.telegramFileId && TG_ON) {
       const j = await tgCall('getFile', { file_id: post.telegramFileId });
@@ -1271,7 +1296,7 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/posts' && req.method === 'GET') {
       await maybeImportTgPhotos();
-      const posts = db.posts.slice().reverse().map(serializePost);
+      const posts = db.posts.slice().reverse().map(x => serializePost(x, true));
       return send(res, 200, { posts });
     }
     if (p === '/api/posts' && req.method === 'POST') {
@@ -1457,9 +1482,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 35, min: 35,
+      return send(res, 200, { ok: true, latest: 36, min: 36,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 1.8 — Reel aur call fix.' });
+        notes: 'Version 1.9 — Fresh funny reels, saaf share card.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
