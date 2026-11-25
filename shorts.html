@@ -15,21 +15,42 @@
 /* GramWasi Shorts wrapper: app (file://) se seedha YouTube embed karne par
    referer nahi jata aur YouTube "Error 153" deta hai. Ye https page asal
    embed yahi se karti hai (sahi referer ke saath) aur app ke bheje hue
-   play/pause postMessage commands YouTube iframe tak relay karti hai. */
+   play/pause postMessage commands YouTube iframe tak relay karti hai.
+   v2.2 (sv=5): loop ke liye playlist param HATA diya — playlist mode me
+   player apne beech wale prev/pause/next button aur title row khud
+   dikhata tha (app ke play/pause calls par bhi). Ab loop player API se
+   hota hai: video khatm (onStateChange state 0) -> seekTo(0)+playVideo. */
 var qs=new URLSearchParams(location.search);
 var v=qs.get("v")||"";
 var ap=(qs.get("autoplay")==="1")?"1":"0";
 var mu=(qs.get("mute")==="0")?"0":"1";
 if(/^[A-Za-z0-9_-]{6,20}$/.test(v)){
   var f=document.createElement("iframe");
-  f.src="https://www.youtube.com/embed/"+v+"?enablejsapi=1&autoplay="+ap+"&mute="+mu+"&loop=1&playlist="+v+"&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&controls=0&origin=https://sagargramwasi.github.io";
+  f.src="https://www.youtube.com/embed/"+v+"?enablejsapi=1&autoplay="+ap+"&mute="+mu+"&playsinline=1&rel=0&modestbranding=1&iv_load_policy=3&controls=0&origin=https://sagargramwasi.github.io";
   f.setAttribute("allow","autoplay; encrypted-media; picture-in-picture");
   f.setAttribute("allowfullscreen","");
   f.setAttribute("title","YouTube Shorts");
   document.body.appendChild(f);
+  function ytCmd(func,args){
+    try{ if(f.contentWindow)f.contentWindow.postMessage(JSON.stringify({event:"command",func:func,args:args||[]}),"https://www.youtube.com"); }catch(err){}
+  }
+  f.addEventListener("load",function(){
+    // Player ke events (onStateChange) sunne ke liye listening handshake.
+    try{ if(f.contentWindow)f.contentWindow.postMessage(JSON.stringify({event:"listening",id:"gw",channel:"widget"}),"https://www.youtube.com"); }catch(err){}
+  });
   window.addEventListener("message",function(e){
-    if(e.source!==window.parent)return;
-    try{ if(f.contentWindow)f.contentWindow.postMessage(e.data,"https://www.youtube.com"); }catch(err){}
+    if(e.source===window.parent){
+      try{ if(f.contentWindow)f.contentWindow.postMessage(e.data,"https://www.youtube.com"); }catch(err){}
+      return;
+    }
+    if(e.source===f.contentWindow){
+      try{
+        var d=(typeof e.data==="string")?JSON.parse(e.data):e.data;
+        var ended=(d&&d.event==="onStateChange"&&d.data===0)||
+                  (d&&d.event==="infoDelivery"&&d.info&&d.info.playerState===0);
+        if(ended){ ytCmd("seekTo",[0,true]); ytCmd("playVideo"); }
+      }catch(err){}
+    }
   });
 }
 </script>
