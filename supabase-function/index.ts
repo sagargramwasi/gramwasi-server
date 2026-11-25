@@ -1515,9 +1515,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 37, min: 37,
+      return send(res, 200, { ok: true, latest: 38, min: 38,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 2.0 — Reactions sabke liye.' });
+        notes: 'Version 2.1 — Shorts bilkul saaf, trending pehle.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
@@ -1704,7 +1704,6 @@ async function handleRequest(req, res) {
 }
 
 const server = http.createServer(handleRequest);
-
 // ============================================================================
 // ===== Fetch adapter: Supabase Edge Function <-> Node-style handleRequest ====
 // ============================================================================
