@@ -101,7 +101,7 @@ const SUPABASE_URL = String(process.env.SUPABASE_URL || '').replace(/\/+$/, '');
 const SUPABASE_KEY = process.env.SUPABASE_ANON_KEY || '';
 const SUPABASE_ON = !!(SUPABASE_URL && SUPABASE_KEY);
 
-let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], signals: [], seq: 1 };
+let db = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], signals: [], ytLikes: {}, seq: 1 };
 let dbReady = false;   // pehli load koshish ho chuki hai
 let dbHasData = false; // db me asli loaded/seed data aa chuka hai (khali initial object nahi)
 let dbLoading = null;  // chal rahi load ka promise (duplicate load rokne ke liye)
@@ -111,7 +111,7 @@ let sbHasRow = false;  // Supabase me app_state ki row (id=1) maujud hai
 let dbLoadOk = false;  // Supabase se ASAL data load hua hai — jab tak false, ye instance save NAHI karega (blind instance kabhi asli data overwrite nahi kar sakta)
 
 function seedData() {
-  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], signals: [], seq: 1 };
+  const d = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], owners: [], signals: [], ytLikes: {}, seq: 1 };
   const mk = (u, name, verified) => ({
     id: d.seq++, username: u, name, bio: '', avatar: 'https://picsum.photos/seed/' + u + '/150/150',
     passwordHash: hash('demo123'), verified: !!verified, blocked: false,
@@ -240,7 +240,7 @@ function ensureWallpaperSeeds() {
   } catch (e) { console.warn('[wp15] seed fail:', (e && e.message) || e); }
 }
 function normalizeDb(d) {
-  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], signals: [], seq: 1 };
+  const out = { users: [], posts: [], messages: [], stories: [], notifications: [], reports: [], signals: [], ytLikes: {}, seq: 1 };
   if (d && typeof d === 'object') {
     if (Array.isArray(d.users)) out.users = d.users;
     if (Array.isArray(d.posts)) out.posts = d.posts;
@@ -253,6 +253,11 @@ function normalizeDb(d) {
     if (d.wpSeededV15 === true) out.wpSeededV15 = true;
     if (Array.isArray(d.owners)) out.owners = d.owners;
     if (Array.isArray(d.signals)) out.signals = d.signals;
+    if (d.ytLikes && typeof d.ytLikes === 'object' && !Array.isArray(d.ytLikes)) {
+      for (const k of Object.keys(d.ytLikes)) {
+        if (Array.isArray(d.ytLikes[k])) out.ytLikes[k] = d.ytLikes[k].filter(x => typeof x === 'string').slice(-50);
+      }
+    }
     if (typeof d.tgOffset === 'number') out.tgOffset = d.tgOffset;
     if (typeof d.tgLastCheck === 'number') out.tgLastCheck = d.tgLastCheck;
   }
@@ -451,7 +456,7 @@ function ensureDb() { return loadDb(false); }
 // tabhi refresh; apna save chal raha ho to refresh skip (purana data na aaye).
 async function refreshIfStale(p, method) {
   if (!SUPABASE_ON || method !== 'GET') return;
-  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/chat/inbox' && p !== '/api/notifications' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover' && p !== '/api/call/signals') return;
+  if (p !== '/api/users' && p !== '/api/chat' && p !== '/api/chat/unread' && p !== '/api/chat/inbox' && p !== '/api/notifications' && p !== '/api/posts' && p !== '/api/stories' && p !== '/api/telegram/discover' && p !== '/api/call/signals' && p !== '/api/yt/likes') return;
   if (pendingSaves > 0) return;
   if (Date.now() - lastLoadAt > 4000) await loadDb(true);
 }
@@ -1216,6 +1221,25 @@ async function handleRequest(req, res) {
       await saveDb();
       return send(res, 200, { ok: true, reactions: m.reactions || {} });
     }
+    if (p === '/api/yt/like' && req.method === 'POST') {
+      // v2.2: YouTube Shorts likes ka server record — "Liked by
+      // friends" bubbles ke liye. db.ytLikes = { videoId: [usernames] },
+      // sabse recent aakhir me, per video cap 50.
+      const u = byName(body.username);
+      if (!u) return send(res, 404, { error: 'user nahi mila' });
+      const vid = String(body.videoId || '');
+      if (!/^[A-Za-z0-9_-]{6,20}$/.test(vid)) return send(res, 400, { error: 'videoId sahi nahi' });
+      if (!db.ytLikes || typeof db.ytLikes !== 'object' || Array.isArray(db.ytLikes)) db.ytLikes = {};
+      let list = Array.isArray(db.ytLikes[vid]) ? db.ytLikes[vid].filter(x => x !== u.username) : [];
+      if (body.liked) list.push(u.username);
+      if (list.length > 50) list = list.slice(-50);
+      if (list.length) db.ytLikes[vid] = list; else delete db.ytLikes[vid];
+      await saveDb();
+      return send(res, 200, { ok: true, videoId: vid, likes: db.ytLikes[vid] || [] });
+    }
+    if (p === '/api/yt/likes' && req.method === 'GET') {
+      return send(res, 200, { ok: true, likes: db.ytLikes || {} });
+    }
     if (p === '/api/crown' && req.method === 'POST') {
       // Game series jeetne par Taj: user par 10 minute ke liye crown.
       // Followers/following ko users list (pub) se har jagah dikhega.
@@ -1515,9 +1539,9 @@ async function handleRequest(req, res) {
     }
     if (p === '/api/app-version' && req.method === 'GET') {
       // Force update: app is endpoint se latest/min version check karta hai.
-      return send(res, 200, { ok: true, latest: 38, min: 38,
+      return send(res, 200, { ok: true, latest: 39, min: 39,
         apkUrl: 'https://raw.githubusercontent.com/sagargramwasi/gramwasi-server/main/GramWasi.apk',
-        notes: 'Version 2.1 — Shorts bilkul saaf, trending pehle.' });
+        notes: 'Version 2.2 — Feed me hi reel autoplay.' });
     }
     if (p === '/api/account/delete' && req.method === 'POST') {
       // Play Store policy: user apna account + data khud delete kar sake.
